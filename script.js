@@ -1,6 +1,5 @@
 const canvas = document.getElementById("canvas");
 const ctx = canvas.getContext("2d");
-const GROSOR_LINEA = 3;
 
 const controles = {
   modoMovimiento: document.getElementById("modoMovimiento"),
@@ -9,9 +8,11 @@ const controles = {
   tamanoPunto: document.getElementById("tamanoPunto"),
   separacion: document.getElementById("separacion"),
   variacionLineas: document.getElementById("variacionLineas"),
+  grosorLinea: document.getElementById("grosorLinea"),
   autoMovimiento: document.getElementById("autoMovimiento"),
   conectarLetras: document.getElementById("conectarLetras"),
-  curvas: document.getElementById("curvas")
+  curvas: document.getElementById("curvas"),
+  descargarSvg: document.getElementById("descargarSvg")
 };
 
 function ajustarCanvas() {
@@ -101,6 +102,14 @@ const parametrosLetra = letras.map((letra) => ({
 
 function limitar(valor, minimo, maximo) {
   return Math.min(Math.max(valor, minimo), maximo);
+}
+
+function obtenerGrosorLinea() {
+  return Number(controles.grosorLinea.value);
+}
+
+function formatearNumero(valor) {
+  return Number(valor.toFixed(3));
 }
 
 function obtenerPointer(evento) {
@@ -421,7 +430,7 @@ function dibujarConexiones() {
     return;
   }
 
-  ctx.lineWidth = GROSOR_LINEA;
+  ctx.lineWidth = obtenerGrosorLinea();
   ctx.lineCap = "round";
   ctx.strokeStyle = "#111";
 
@@ -510,7 +519,7 @@ function puntoInteractivo(letra, punto) {
 
 function dibujarLetras() {
   const tamanoPunto = Number(controles.tamanoPunto.value);
-  ctx.lineWidth = GROSOR_LINEA;
+  ctx.lineWidth = obtenerGrosorLinea();
   ctx.lineCap = "round";
   ctx.strokeStyle = "#111";
   ctx.fillStyle = "#111";
@@ -531,6 +540,142 @@ function dibujarLetras() {
     });
   });
 }
+
+function comandoMover(punto) {
+  return `M ${formatearNumero(punto.x)} ${formatearNumero(punto.y)}`;
+}
+
+function comandoLinea(punto) {
+  return `L ${formatearNumero(punto.x)} ${formatearNumero(punto.y)}`;
+}
+
+function comandoCurvaCuadratica(control, fin) {
+  return [
+    "Q",
+    formatearNumero(control.x),
+    formatearNumero(control.y),
+    formatearNumero(fin.x),
+    formatearNumero(fin.y)
+  ].join(" ");
+}
+
+function comandoCurvaBezier(controlA, controlB, fin) {
+  return [
+    "C",
+    formatearNumero(controlA.x),
+    formatearNumero(controlA.y),
+    formatearNumero(controlB.x),
+    formatearNumero(controlB.y),
+    formatearNumero(fin.x),
+    formatearNumero(fin.y)
+  ].join(" ");
+}
+
+function crearPathLetra(letra, puntos, indiceLetra) {
+  const comandos = [];
+
+  if (letra.tipo === "P" && controles.curvas.checked) {
+    comandos.push(
+      comandoMover(puntos[0]),
+      comandoLinea(puntos[1]),
+      comandoMover(puntos[1]),
+      comandoCurvaBezier(puntos[2], puntos[3], puntos[4])
+    );
+    return comandos.join(" ");
+  }
+
+  letra.lineas.forEach(([a, b]) => {
+    if (esUltimaAConectada(indiceLetra) && a === 0 && b === 1) {
+      comandos.push(comandoMover(puntos[3]), comandoLinea(puntos[1]));
+      return;
+    }
+
+    comandos.push(comandoMover(puntos[a]), comandoLinea(puntos[b]));
+  });
+
+  return comandos.join(" ");
+}
+
+function crearPathConexionPA() {
+  const [letraOrigen, puntoOrigen] = curvaPA.desde;
+  const [letraDestino, puntoDestino] = curvaPA.hasta;
+  const origen = puntosRenderizados[letraOrigen][puntoOrigen];
+  const destino = puntosRenderizados[letraDestino][puntoDestino];
+  const punta = puntosRenderizados[letraDestino][1];
+  const control = controles.curvas.checked
+    ? obtenerControlCurvaPA(origen, destino, punta)
+    : interpolarPunto(origen, destino, 0.5);
+
+  return [
+    comandoMover(origen),
+    comandoCurvaCuadratica(control, destino)
+  ].join(" ");
+}
+
+function crearElementoPath(d) {
+  return `    <path d="${d}" stroke="#111" fill="none" stroke-linecap="round" stroke-linejoin="round" stroke-width="${formatearNumero(obtenerGrosorLinea())}" />`;
+}
+
+function crearElementoCirculo(punto) {
+  const radio = formatearNumero(Number(controles.tamanoPunto.value));
+
+  return `    <circle cx="${formatearNumero(punto.x)}" cy="${formatearNumero(punto.y)}" r="${radio}" fill="#8a8a8a" stroke="none" />`;
+}
+
+function crearCirculosPuntosVisibles() {
+  return letras.flatMap((letra, indiceLetra) =>
+    puntosRenderizados[indiceLetra]
+      .filter((punto) => puntoVisible(letra, punto))
+      .map(crearElementoCirculo)
+  );
+}
+
+function crearSvgActual() {
+  const rect = canvas.getBoundingClientRect();
+  const ancho = formatearNumero(rect.width);
+  const alto = formatearNumero(rect.height);
+
+  tiempoCongelado = tiempo;
+  calcularPuntos();
+
+  const paths = letras.map((letra, indiceLetra) =>
+    crearElementoPath(crearPathLetra(letra, puntosRenderizados[indiceLetra], indiceLetra))
+  );
+
+  if (controles.conectarLetras.checked) {
+    paths.push(crearElementoPath(crearPathConexionPA()));
+  }
+
+  const puntos = crearCirculosPuntosVisibles();
+
+  return [
+    '<?xml version="1.0" encoding="UTF-8"?>',
+    `<svg xmlns="http://www.w3.org/2000/svg" width="${ancho}" height="${alto}" viewBox="0 0 ${ancho} ${alto}">`,
+    '  <g id="lineas-negras">',
+    ...paths,
+    "  </g>",
+    '  <g id="puntos-grises">',
+    ...puntos,
+    "  </g>",
+    "</svg>"
+  ].join("\n");
+}
+
+function descargarSvgActual() {
+  const svg = crearSvgActual();
+  const blob = new Blob([svg], { type: "image/svg+xml;charset=utf-8" });
+  const url = URL.createObjectURL(blob);
+  const enlace = document.createElement("a");
+
+  enlace.href = url;
+  enlace.download = "amapa-export.svg";
+  document.body.appendChild(enlace);
+  enlace.click();
+  enlace.remove();
+  URL.revokeObjectURL(url);
+}
+
+controles.descargarSvg.addEventListener("click", descargarSvgActual);
 
 function encontrarPuntoCercano(posicion) {
   let cercano = null;

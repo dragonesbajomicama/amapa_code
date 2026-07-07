@@ -62,6 +62,24 @@ select {
   color: #111;
 }
 
+.boton-exportar {
+  min-height: 40px;
+  padding: 0 14px;
+  border: 1px solid #111;
+  border-radius: 4px;
+  background: #111;
+  color: #efeee8;
+  font: inherit;
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  cursor: pointer;
+}
+
+.boton-exportar:hover {
+  background: #333;
+}
+
 .switch {
   grid-template-columns: auto 1fr;
   align-items: center;
