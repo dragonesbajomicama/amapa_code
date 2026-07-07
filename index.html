@@ -14,67 +14,91 @@
       </p>
 
       <div class="controles">
-        <label class="campo">
-          Modo movimiento
-          <select id="modoMovimiento">
-            <option value="organico">Orgánico</option>
-            <option value="onda">Onda</option>
-            <option value="pulso">Pulso</option>
-            <option value="temblor">Temblor</option>
-          </select>
-        </label>
+        <fieldset class="grupo-controles">
+          <legend>Movimiento</legend>
 
-        <label>
-          Movimiento
-          <input id="movimiento" type="range" min="0" max="40" value="10" />
-        </label>
+          <label class="campo">
+            Modo
+            <select id="modoMovimiento">
+              <option value="organico">Orgánico</option>
+              <option value="onda">Onda</option>
+              <option value="pulso">Pulso</option>
+              <option value="temblor">Temblor</option>
+            </select>
+          </label>
 
-        <label>
-          Velocidad
-          <input id="velocidad" type="range" min="1" max="80" value="20" />
-        </label>
+          <label class="switch">
+            <input id="autoMovimiento" type="checkbox" checked />
+            <span></span>
+            Play/Pausa
+          </label>
 
-        <label>
-          Tamaño punto
-          <input id="tamanoPunto" type="range" min="2" max="20" value="8" />
-        </label>
+          <label>
+            Velocidad
+            <input id="velocidad" type="range" min="1" max="80" value="20" />
+          </label>
 
-        <label>
-          Separación
-          <input id="separacion" type="range" min="18" max="95" value="44" />
-        </label>
+          <label>
+            Movimiento
+            <input id="movimiento" type="range" min="0" max="40" value="10" />
+          </label>
+        </fieldset>
 
-        <label>
-          Longitud curva
-          <input id="variacionLineas" type="range" min="0" max="120" value="54" />
-        </label>
+        <fieldset class="grupo-controles">
+          <legend>Forma</legend>
 
-        <label>
-          Grosor línea
-          <input id="grosorLinea" type="range" min="1" max="14" value="3" />
-        </label>
+          <label class="switch">
+            <input id="conectarLetras" type="checkbox" />
+            <span></span>
+            Conectar letras
+          </label>
 
-        <label class="switch">
-          <input id="autoMovimiento" type="checkbox" checked />
-          <span></span>
-          Play/Pausa
-        </label>
+          <label class="switch">
+            <input id="curvas" type="checkbox" checked />
+            <span></span>
+            Curvas
+          </label>
 
-        <label class="switch">
-          <input id="conectarLetras" type="checkbox" />
-          <span></span>
-          Conectar letras
-        </label>
+          <label>
+            Separación
+            <input id="separacion" type="range" min="18" max="95" value="44" />
+          </label>
 
-        <label class="switch">
-          <input id="curvas" type="checkbox" checked />
-          <span></span>
-          Curvas
-        </label>
+          <label>
+            Longitud curva
+            <input id="variacionLineas" type="range" min="0" max="120" value="54" />
+          </label>
+        </fieldset>
 
-        <button id="descargarSvg" class="boton-exportar" type="button">
-          Descargar SVG actual
-        </button>
+        <fieldset class="grupo-controles">
+          <legend>Apariencia</legend>
+
+          <label>
+            Tamaño punto
+            <input id="tamanoPunto" type="range" min="2" max="20" value="8" />
+          </label>
+
+          <label class="campo-color">
+            Color puntos
+            <input id="colorPunto" type="color" value="#8a8a8a" />
+          </label>
+
+          <label>
+            Grosor línea
+            <input id="grosorLinea" type="range" min="1" max="14" value="3" />
+          </label>
+
+          <label class="campo-color">
+            Color líneas
+            <input id="colorLinea" type="color" value="#111111" />
+          </label>
+        </fieldset>
+
+        <div class="acciones">
+          <button id="descargarSvg" class="boton-exportar" type="button">
+            Descargar SVG actual
+          </button>
+        </div>
       </div>
     </section>
 

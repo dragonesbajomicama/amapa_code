@@ -9,6 +9,8 @@ const controles = {
   separacion: document.getElementById("separacion"),
   variacionLineas: document.getElementById("variacionLineas"),
   grosorLinea: document.getElementById("grosorLinea"),
+  colorLinea: document.getElementById("colorLinea"),
+  colorPunto: document.getElementById("colorPunto"),
   autoMovimiento: document.getElementById("autoMovimiento"),
   conectarLetras: document.getElementById("conectarLetras"),
   curvas: document.getElementById("curvas"),
@@ -106,6 +108,14 @@ function limitar(valor, minimo, maximo) {
 
 function obtenerGrosorLinea() {
   return Number(controles.grosorLinea.value);
+}
+
+function obtenerColorLinea() {
+  return controles.colorLinea.value;
+}
+
+function obtenerColorPunto() {
+  return controles.colorPunto.value;
 }
 
 function formatearNumero(valor) {
@@ -432,7 +442,7 @@ function dibujarConexiones() {
 
   ctx.lineWidth = obtenerGrosorLinea();
   ctx.lineCap = "round";
-  ctx.strokeStyle = "#111";
+  ctx.strokeStyle = obtenerColorLinea();
 
   const [letraOrigen, puntoOrigen] = curvaPA.desde;
   const [letraDestino, puntoDestino] = curvaPA.hasta;
@@ -517,17 +527,24 @@ function puntoInteractivo(letra, punto) {
   );
 }
 
-function dibujarLetras() {
-  const tamanoPunto = Number(controles.tamanoPunto.value);
+function dibujarTrazosLetras() {
   ctx.lineWidth = obtenerGrosorLinea();
   ctx.lineCap = "round";
-  ctx.strokeStyle = "#111";
-  ctx.fillStyle = "#111";
+  ctx.strokeStyle = obtenerColorLinea();
 
   letras.forEach((letra, indiceLetra) => {
     const puntos = puntosRenderizados[indiceLetra];
 
     dibujarTrazoLetra(letra, puntos, indiceLetra);
+  });
+}
+
+function dibujarPuntos() {
+  const tamanoPunto = Number(controles.tamanoPunto.value);
+  ctx.fillStyle = obtenerColorPunto();
+
+  letras.forEach((letra, indiceLetra) => {
+    const puntos = puntosRenderizados[indiceLetra];
 
     puntos.forEach((punto) => {
       if (!puntoVisible(letra, punto)) {
@@ -613,13 +630,13 @@ function crearPathConexionPA() {
 }
 
 function crearElementoPath(d) {
-  return `    <path d="${d}" stroke="#111" fill="none" stroke-linecap="round" stroke-linejoin="round" stroke-width="${formatearNumero(obtenerGrosorLinea())}" />`;
+  return `    <path d="${d}" stroke="${obtenerColorLinea()}" fill="none" stroke-linecap="round" stroke-linejoin="round" stroke-width="${formatearNumero(obtenerGrosorLinea())}" />`;
 }
 
 function crearElementoCirculo(punto) {
   const radio = formatearNumero(Number(controles.tamanoPunto.value));
 
-  return `    <circle cx="${formatearNumero(punto.x)}" cy="${formatearNumero(punto.y)}" r="${radio}" fill="#8a8a8a" stroke="none" />`;
+  return `    <circle cx="${formatearNumero(punto.x)}" cy="${formatearNumero(punto.y)}" r="${radio}" fill="${obtenerColorPunto()}" stroke="none" />`;
 }
 
 function crearCirculosPuntosVisibles() {
@@ -669,10 +686,14 @@ function descargarSvgActual() {
 
   enlace.href = url;
   enlace.download = "amapa-export.svg";
+  enlace.style.display = "none";
   document.body.appendChild(enlace);
   enlace.click();
-  enlace.remove();
-  URL.revokeObjectURL(url);
+
+  setTimeout(() => {
+    enlace.remove();
+    URL.revokeObjectURL(url);
+  }, 1000);
 }
 
 controles.descargarSvg.addEventListener("click", descargarSvgActual);
@@ -850,8 +871,9 @@ function dibujar() {
   ctx.clearRect(0, 0, w, h);
   tiempoCongelado = tiempo;
   calcularPuntos();
-  dibujarLetras();
+  dibujarTrazosLetras();
   dibujarConexiones();
+  dibujarPuntos();
 
   if (controles.autoMovimiento.checked) {
     tiempo += Number(controles.velocidad.value) / 1000;
