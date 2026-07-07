@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>AMAPA — sistema de puntos</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <main>
+    <section class="panel">
+      <h1>AMAPA</h1>
+      <p>Sistema de nodos móviles
+      </p>
+
+      <div class="controles">
+        <label class="campo">
+          Modo movimiento
+          <select id="modoMovimiento">
+            <option value="organico">Orgánico</option>
+            <option value="onda">Onda</option>
+            <option value="pulso">Pulso</option>
+            <option value="temblor">Temblor</option>
+          </select>
+        </label>
+
+        <label>
+          Movimiento
+          <input id="movimiento" type="range" min="0" max="40" value="10" />
+        </label>
+
+        <label>
+          Velocidad
+          <input id="velocidad" type="range" min="1" max="80" value="20" />
+        </label>
+
+        <label>
+          Tamaño punto
+          <input id="tamanoPunto" type="range" min="2" max="20" value="8" />
+        </label>
+
+        <label>
+          Separación
+          <input id="separacion" type="range" min="18" max="95" value="44" />
+        </label>
+
+        <label>
+          Longitud curva
+          <input id="variacionLineas" type="range" min="0" max="120" value="54" />
+        </label>
+
+        <label class="switch">
+          <input id="autoMovimiento" type="checkbox" checked />
+          <span></span>
+          Play/Pausa
+        </label>
+
+        <label class="switch">
+          <input id="conectarLetras" type="checkbox" />
+          <span></span>
+          Conectar letras
+        </label>
+
+        <label class="switch">
+          <input id="curvas" type="checkbox" checked />
+          <span></span>
+          Curvas
+        </label>
+      </div>
+    </section>
+
+    <canvas id="canvas"></canvas>
+  </main>
+
+  <script src="script.js"></script>
+</body>
+</html>
