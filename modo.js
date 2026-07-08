@@ -6,6 +6,7 @@
   const canvasPersonaje = document.getElementById("canvasPersonaje");
   const contenedorLienzos = document.querySelector(".lienzos");
   const botonesDescarga = [document.getElementById("descargarSvg")].filter(Boolean);
+  const colorFondo = document.getElementById("colorFondo");
 
   function numero(valor) {
     return Number(valor.toFixed(3));
@@ -13,6 +14,14 @@
 
   function obtenerModoActivo() {
     return document.querySelector(".modo-boton.activo")?.dataset.modo || "amapa";
+  }
+
+  function obtenerColorFondo() {
+    return colorFondo?.value || "#efeee8";
+  }
+
+  function aplicarColorFondo() {
+    document.body.style.setProperty("--color-fondo", obtenerColorFondo());
   }
 
   function crearSvgVistaActual() {
@@ -41,6 +50,7 @@
     return [
       '<?xml version="1.0" encoding="UTF-8"?>',
       `<svg xmlns="http://www.w3.org/2000/svg" width="${ancho}" height="${alto}" viewBox="0 0 ${ancho} ${alto}">`,
+      `  <rect width="100%" height="100%" fill="${obtenerColorFondo()}" />`,
       '  <g id="lineas-negras">',
       ...paths,
       "  </g>",
@@ -109,4 +119,7 @@
   botonesDescarga.forEach((boton) => {
     boton.addEventListener("click", descargarSvgVistaActual);
   });
+
+  colorFondo?.addEventListener("input", aplicarColorFondo);
+  aplicarColorFondo();
 })();

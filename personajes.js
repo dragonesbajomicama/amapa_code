@@ -13,7 +13,9 @@
     autoMovimiento: document.getElementById("autoMovimiento"),
     gravedad: document.getElementById("gravedadPersonaje"),
     doblarTabla: document.getElementById("doblarTablaPersonaje"),
+    modoTabla: document.getElementById("modoTablaPersonaje"),
     cabezaDelineada: document.getElementById("cabezaDelineadaPersonaje"),
+    extremidadesCurvas: document.getElementById("extremidadesCurvasPersonaje"),
     tamanoPunto: document.getElementById("tamanoPunto"),
     grosorLinea: document.getElementById("grosorLinea"),
     colorPunto: document.getElementById("colorPunto"),
@@ -22,19 +24,22 @@
   };
 
   const nodosBase = {
-    cabeza: { x: 0, y: -152 },
-    hombroIzq: { x: -42, y: -98 },
-    hombroDer: { x: 42, y: -98 },
-    pecho: { x: 0, y: -70 },
-    coxis: { x: 0, y: -18 },
-    codoIzq: { x: -76, y: -56 },
-    codoDer: { x: 76, y: -56 },
-    rodillaIzq: { x: -46, y: 34 },
-    rodillaDer: { x: 46, y: 34 },
-    pieIzq: { x: -72, y: 88 },
-    pieDer: { x: 72, y: 88 },
-    tablaIzq: { x: -118, y: 108 },
-    tablaDer: { x: 118, y: 104 }
+    cabeza: { x: 0, y: -114 },
+    hombroIzq: { x: -32, y: -88 },
+    hombroDer: { x: 32, y: -88 },
+    pecho: { x: 0, y: -64 },
+    coxis: { x: 0, y: -24 },
+    codoIzq: { x: -58, y: -58 },
+    codoDer: { x: 58, y: -58 },
+    rodillaIzq: { x: -34, y: 20 },
+    rodillaDer: { x: 34, y: 20 },
+    pieIzq: { x: -52, y: 62 },
+    pieDer: { x: 52, y: 62 },
+    tablaIzq: { x: -86, y: 82 },
+    tablaBiciA: { x: -44, y: 56 },
+    tablaBiciB: { x: 0, y: 94 },
+    tablaBiciC: { x: 44, y: 56 },
+    tablaDer: { x: 86, y: 78 }
   };
 
   const lineas = [
@@ -48,7 +53,8 @@
     ["coxis", "rodillaDer"],
     ["rodillaDer", "pieDer"]
   ];
-  const nodosInvisibles = new Set(["pecho", "coxis"]);
+  const nodosInvisibles = new Set(["pecho", "coxis", "tablaBiciA", "tablaBiciB", "tablaBiciC"]);
+  const escalaPersonaje = 0.84;
 
   const estado = {
     nodos: clonarNodos(nodosBase),
@@ -84,7 +90,7 @@
     return {
       ancho: rect.width,
       alto: rect.height,
-      escala: Math.min(rect.width / 560, rect.height / 450),
+      escala: Math.min(rect.width / 560, rect.height / 450) * escalaPersonaje,
       origenX: rect.width / 2 + estado.vista.x,
       origenY: rect.height / 2 + 30 + estado.vista.y
     };
@@ -190,6 +196,40 @@
     ctxPersonaje.stroke();
   }
 
+  function dibujarCurvaArticulada(formas, a, control, b) {
+    dibujarCurvaDirecta(formas, a, controlArticulado(a, control, b), b);
+  }
+
+  function dibujarCurvaSuave(formas, puntos) {
+    const comandos = [comandoM(puntos[0])];
+
+    ctxPersonaje.beginPath();
+    ctxPersonaje.moveTo(puntos[0].x, puntos[0].y);
+
+    for (let i = 0; i < puntos.length - 1; i += 1) {
+      const p0 = puntos[Math.max(i - 1, 0)];
+      const p1 = puntos[i];
+      const p2 = puntos[i + 1];
+      const p3 = puntos[Math.min(i + 2, puntos.length - 1)];
+      const c1 = {
+        x: p1.x + (p2.x - p0.x) / 6,
+        y: p1.y + (p2.y - p0.y) / 6
+      };
+      const c2 = {
+        x: p2.x - (p3.x - p1.x) / 6,
+        y: p2.y - (p3.y - p1.y) / 6
+      };
+
+      comandos.push(
+        `C ${numero(c1.x)} ${numero(c1.y)} ${numero(c2.x)} ${numero(c2.y)} ${numero(p2.x)} ${numero(p2.y)}`
+      );
+      ctxPersonaje.bezierCurveTo(c1.x, c1.y, c2.x, c2.y, p2.x, p2.y);
+    }
+
+    formas.paths.push(comandos.join(" "));
+    ctxPersonaje.stroke();
+  }
+
   function desplazarHacia(origen, destino, distancia) {
     const dx = destino.x - origen.x;
     const dy = destino.y - origen.y;
@@ -201,12 +241,17 @@
     };
   }
 
-  function dibujarCirculo(formas, centro, radio, fill = true, stroke = false) {
-    formas.circles.push({ x: centro.x, y: centro.y, r: radio, fill, stroke });
+  function dibujarCirculo(formas, centro, radio, fill = true, stroke = false, fillColor = null) {
+    formas.circles.push({ x: centro.x, y: centro.y, r: radio, fill, stroke, fillColor });
     ctxPersonaje.beginPath();
     ctxPersonaje.arc(centro.x, centro.y, radio, 0, Math.PI * 2);
     if (fill) {
+      const fillAnterior = ctxPersonaje.fillStyle;
+      if (fillColor) {
+        ctxPersonaje.fillStyle = fillColor;
+      }
       ctxPersonaje.fill();
+      ctxPersonaje.fillStyle = fillAnterior;
     }
     if (stroke) {
       ctxPersonaje.stroke();
@@ -226,6 +271,20 @@
   }
 
   function drawSkeleton(formas, puntos) {
+    if (controles.extremidadesCurvas.checked) {
+      dibujarLinea(formas, puntos.pecho, puntos.coxis);
+
+      [
+        ["pecho", "hombroIzq", "codoIzq"],
+        ["pecho", "hombroDer", "codoDer"],
+        ["coxis", "rodillaIzq", "pieIzq"],
+        ["coxis", "rodillaDer", "pieDer"]
+      ].forEach(([inicio, control, fin]) => {
+        dibujarCurvaArticulada(formas, puntos[inicio], puntos[control], puntos[fin]);
+      });
+      return;
+    }
+
     lineas.forEach(([inicio, fin]) => {
       dibujarLinea(formas, puntos[inicio], puntos[fin]);
     });
@@ -235,9 +294,24 @@
     const curva = Number(controles.doblarTabla.value);
     const radio = obtenerRadioPunto();
     const separacionOjo = Math.max(7, radio * 1.15);
-    const margenNodo = controles.cabezaDelineada.checked ? radio + separacionOjo : radio;
+    const margenNodo = radio + separacionOjo;
     const centroA = puntos.tablaIzq;
     const centroB = puntos.tablaDer;
+
+    if (controles.modoTabla.value === "bici") {
+      const a = desplazarHacia(centroA, puntos.tablaBiciA, margenNodo);
+      const b = desplazarHacia(centroB, puntos.tablaBiciC, margenNodo);
+      const direccion = curva * 0.28 * escala;
+      dibujarCurvaSuave(formas, [
+        a,
+        { x: puntos.tablaBiciA.x, y: puntos.tablaBiciA.y - direccion },
+        puntos.tablaBiciB,
+        { x: puntos.tablaBiciC.x, y: puntos.tablaBiciC.y - direccion },
+        b
+      ]);
+      return;
+    }
+
     const a = desplazarHacia(centroA, centroB, margenNodo);
     const b = desplazarHacia(centroB, centroA, margenNodo);
     const control = {
@@ -254,18 +328,19 @@
 
   function drawNodes(formas, puntos, escala) {
     const radio = obtenerRadioPunto();
+    const nodosExtremidad = new Set(["hombroIzq", "hombroDer", "rodillaIzq", "rodillaDer"]);
 
     Object.keys(estado.nodos).forEach((nombre) => {
-      if (nodosInvisibles.has(nombre)) {
+      if (nodosInvisibles.has(nombre) || (controles.extremidadesCurvas.checked && nodosExtremidad.has(nombre))) {
         return;
       }
 
       if (
-        controles.cabezaDelineada.checked &&
         (nombre === "cabeza" || nombre === "tablaIzq" || nombre === "tablaDer")
       ) {
         const separacionOjo = Math.max(7, radio * 1.15);
-        dibujarCirculo(formas, puntos[nombre], radio + separacionOjo, false, true);
+        const fillOjo = controles.cabezaDelineada.checked ? "#ffffff" : null;
+        dibujarCirculo(formas, puntos[nombre], radio + separacionOjo, Boolean(fillOjo), true, fillOjo);
         dibujarCirculo(formas, puntos[nombre], radio, true);
         return;
       }
@@ -314,8 +389,13 @@
   function nodoCercano(posicion) {
     let elegido = null;
     let distanciaMinima = Infinity;
+    const nodosSoloBici = new Set(["tablaBiciA", "tablaBiciB", "tablaBiciC"]);
 
     Object.entries(estado.mapaRender).forEach(([nombre, punto]) => {
+      if (nodosSoloBici.has(nombre) && controles.modoTabla.value !== "bici") {
+        return;
+      }
+
       const distancia = Math.hypot(posicion.x - punto.x, posicion.y - punto.y);
       if (distancia < distanciaMinima) {
         distanciaMinima = distancia;
@@ -324,6 +404,199 @@
     });
 
     return distanciaMinima <= 20 ? elegido : null;
+  }
+
+  function distanciaASegmento(posicion, a, b) {
+    const dx = b.x - a.x;
+    const dy = b.y - a.y;
+    const largo = Math.max(dx * dx + dy * dy, 1);
+    const t = Math.min(Math.max(((posicion.x - a.x) * dx + (posicion.y - a.y) * dy) / largo, 0), 1);
+    const x = a.x + dx * t;
+    const y = a.y + dy * t;
+
+    return Math.hypot(posicion.x - x, posicion.y - y);
+  }
+
+  function distanciaACurva(posicion, a, control, b) {
+    let distanciaMinima = Infinity;
+    let anterior = a;
+
+    for (let i = 1; i <= 24; i += 1) {
+      const t = i / 24;
+      const inv = 1 - t;
+      const punto = {
+        x: inv * inv * a.x + 2 * inv * t * control.x + t * t * b.x,
+        y: inv * inv * a.y + 2 * inv * t * control.y + t * t * b.y
+      };
+
+      distanciaMinima = Math.min(distanciaMinima, distanciaASegmento(posicion, anterior, punto));
+      anterior = punto;
+    }
+
+    return distanciaMinima;
+  }
+
+  function controlArticulado(a, control, b) {
+    const medio = { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 };
+
+    return {
+      x: medio.x + (control.x - medio.x) * 1.55,
+      y: medio.y + (control.y - medio.y) * 1.55
+    };
+  }
+
+  function distanciaAPolilineaSuave(posicion, puntos) {
+    let distanciaMinima = Infinity;
+    let anterior = puntos[0];
+
+    for (let i = 0; i < puntos.length - 1; i += 1) {
+      const p0 = puntos[Math.max(i - 1, 0)];
+      const p1 = puntos[i];
+      const p2 = puntos[i + 1];
+      const p3 = puntos[Math.min(i + 2, puntos.length - 1)];
+      const c1 = { x: p1.x + (p2.x - p0.x) / 6, y: p1.y + (p2.y - p0.y) / 6 };
+      const c2 = { x: p2.x - (p3.x - p1.x) / 6, y: p2.y - (p3.y - p1.y) / 6 };
+
+      for (let paso = 1; paso <= 12; paso += 1) {
+        const t = paso / 12;
+        const inv = 1 - t;
+        const punto = {
+          x:
+            inv * inv * inv * p1.x +
+            3 * inv * inv * t * c1.x +
+            3 * inv * t * t * c2.x +
+            t * t * t * p2.x,
+          y:
+            inv * inv * inv * p1.y +
+            3 * inv * inv * t * c1.y +
+            3 * inv * t * t * c2.y +
+            t * t * t * p2.y
+        };
+
+        distanciaMinima = Math.min(distanciaMinima, distanciaASegmento(posicion, anterior, punto));
+        anterior = punto;
+      }
+    }
+
+    return distanciaMinima;
+  }
+
+  function obtenerCurvaTabla() {
+    const curva = Number(controles.doblarTabla.value);
+    const radio = obtenerRadioPunto();
+    const separacionOjo = Math.max(7, radio * 1.15);
+    const margenNodo = radio + separacionOjo;
+    const centroA = estado.mapaRender.tablaIzq;
+    const centroB = estado.mapaRender.tablaDer;
+
+    if (!centroA || !centroB) {
+      return null;
+    }
+
+    const esBici = controles.modoTabla.value === "bici";
+    const a = esBici
+      ? desplazarHacia(centroA, estado.mapaRender.tablaBiciA, margenNodo)
+      : desplazarHacia(centroA, centroB, margenNodo);
+    const b = esBici
+      ? desplazarHacia(centroB, estado.mapaRender.tablaBiciC, margenNodo)
+      : desplazarHacia(centroB, centroA, margenNodo);
+    const control = {
+      x: (a.x + b.x) / 2,
+      y: (a.y + b.y) / 2 - curva * 2.8 * obtenerLayout().escala
+    };
+    const direccion = curva * 0.28 * obtenerLayout().escala;
+    const puntosBici = [
+      a,
+      { x: estado.mapaRender.tablaBiciA.x, y: estado.mapaRender.tablaBiciA.y - direccion },
+      estado.mapaRender.tablaBiciB,
+      { x: estado.mapaRender.tablaBiciC.x, y: estado.mapaRender.tablaBiciC.y - direccion },
+      b
+    ];
+
+    return {
+      a,
+      b,
+      curva,
+      control,
+      puntosBici
+    };
+  }
+
+  function dentroDeGrupo(posicion, nombres, margen = 22) {
+    const puntos = nombres.map((nombre) => estado.mapaRender[nombre]).filter(Boolean);
+    const xs = puntos.map((punto) => punto.x);
+    const ys = puntos.map((punto) => punto.y);
+
+    if (!puntos.length) {
+      return false;
+    }
+
+    return (
+      posicion.x >= Math.min(...xs) - margen &&
+      posicion.x <= Math.max(...xs) + margen &&
+      posicion.y >= Math.min(...ys) - margen &&
+      posicion.y <= Math.max(...ys) + margen
+    );
+  }
+
+  function tablaCercana(posicion) {
+    const tabla = obtenerCurvaTabla();
+    const umbral = Math.max(Number(controles.grosorLinea.value) * 4, 18);
+
+    if (!tabla) {
+      return false;
+    }
+
+    const distancia =
+      controles.modoTabla.value === "bici"
+        ? distanciaAPolilineaSuave(posicion, tabla.puntosBici)
+        : tabla.curva === 0
+        ? distanciaASegmento(posicion, tabla.a, tabla.b)
+        : distanciaACurva(posicion, tabla.a, tabla.control, tabla.b);
+
+    return distancia <= umbral;
+  }
+
+  function personajeCercano(posicion) {
+    const umbral = Math.max(Number(controles.grosorLinea.value) * 4, 18);
+    const enLinea = controles.extremidadesCurvas.checked
+      ? [["pecho", "coxis"]].some(([inicio, fin]) =>
+          distanciaASegmento(posicion, estado.mapaRender[inicio], estado.mapaRender[fin]) <= umbral
+        ) ||
+        [
+          ["pecho", "hombroIzq", "codoIzq"],
+          ["pecho", "hombroDer", "codoDer"],
+          ["coxis", "rodillaIzq", "pieIzq"],
+          ["coxis", "rodillaDer", "pieDer"]
+        ].some(([inicio, control, fin]) =>
+          distanciaACurva(
+            posicion,
+            estado.mapaRender[inicio],
+            controlArticulado(
+              estado.mapaRender[inicio],
+              estado.mapaRender[control],
+              estado.mapaRender[fin]
+            ),
+            estado.mapaRender[fin]
+          ) <= umbral
+        )
+      : lineas.some(([inicio, fin]) =>
+          distanciaASegmento(posicion, estado.mapaRender[inicio], estado.mapaRender[fin]) <= umbral
+        );
+    const enCentro = dentroDeGrupo(
+      posicion,
+      ["hombroIzq", "hombroDer", "pecho", "coxis", "codoIzq", "codoDer", "rodillaIzq", "rodillaDer", "pieIzq", "pieDer"],
+      umbral
+    );
+
+    return enLinea || enCentro;
+  }
+
+  function moverNodos(nombres, dx, dy, layout) {
+    nombres.forEach((nombre) => {
+      estado.nodos[nombre].x += dx / layout.escala;
+      estado.nodos[nombre].y += dy / layout.escala;
+    });
   }
 
   function vistaAmbosActiva() {
@@ -370,7 +643,7 @@
         `    <path d="${d}" stroke="${controles.colorLinea.value}" fill="none" stroke-linecap="round" stroke-linejoin="round" stroke-width="${numero(Number(controles.grosorLinea.value))}" />`
     );
     const circles = estado.formas.circles.map((c) => {
-      const fill = c.fill ? controles.colorPunto.value : "none";
+      const fill = c.fill ? c.fillColor || controles.colorPunto.value : "none";
       const stroke = c.stroke ? controles.colorLinea.value : "none";
       return `    <circle cx="${numero(c.x)}" cy="${numero(c.y)}" r="${numero(c.r)}" fill="${fill}" stroke="${stroke}" stroke-width="${numero(Number(controles.grosorLinea.value))}" />`;
     });
@@ -400,6 +673,28 @@
     const nodo = nodoCercano(posicion);
 
     if (!nodo) {
+      if (tablaCercana(posicion)) {
+        estado.arrastre = {
+          tipo: "tabla",
+          x: posicion.x,
+          y: posicion.y
+        };
+        canvasPersonaje.setPointerCapture(evento.pointerId);
+        canvasPersonaje.style.cursor = "grabbing";
+        return;
+      }
+
+      if (personajeCercano(posicion)) {
+        estado.arrastre = {
+          tipo: "personaje",
+          x: posicion.x,
+          y: posicion.y
+        };
+        canvasPersonaje.setPointerCapture(evento.pointerId);
+        canvasPersonaje.style.cursor = "grabbing";
+        return;
+      }
+
       if (vistaAmbosActiva() && window.amapaPointerProxy) {
         const tipoAmapa = window.amapaPointerProxy.down(posicion);
         estado.arrastre = {
@@ -462,6 +757,32 @@
       return;
     }
 
+    if (estado.arrastre.tipo === "tabla") {
+      moverNodos(
+        ["tablaIzq", "tablaBiciA", "tablaBiciB", "tablaBiciC", "tablaDer"],
+        posicion.x - estado.arrastre.x,
+        posicion.y - estado.arrastre.y,
+        obtenerLayout()
+      );
+      estado.arrastre.x = posicion.x;
+      estado.arrastre.y = posicion.y;
+      renderPersonaje();
+      return;
+    }
+
+    if (estado.arrastre.tipo === "personaje") {
+      moverNodos(
+        ["cabeza", "hombroIzq", "hombroDer", "pecho", "coxis", "codoIzq", "codoDer", "rodillaIzq", "rodillaDer", "pieIzq", "pieDer"],
+        posicion.x - estado.arrastre.x,
+        posicion.y - estado.arrastre.y,
+        obtenerLayout()
+      );
+      estado.arrastre.x = posicion.x;
+      estado.arrastre.y = posicion.y;
+      renderPersonaje();
+      return;
+    }
+
     estado.nodos[estado.arrastre.nombre] = desproyectar(posicion, obtenerLayout());
     renderPersonaje();
   });
@@ -491,7 +812,9 @@
   controles.modoMovimiento.addEventListener("input", renderPersonaje);
   controles.gravedad.addEventListener("input", renderPersonaje);
   controles.doblarTabla.addEventListener("input", renderPersonaje);
+  controles.modoTabla.addEventListener("input", renderPersonaje);
   controles.cabezaDelineada.addEventListener("input", renderPersonaje);
+  controles.extremidadesCurvas.addEventListener("input", renderPersonaje);
   controles.tamanoPunto.addEventListener("input", renderPersonaje);
   controles.grosorLinea.addEventListener("input", renderPersonaje);
   controles.colorPunto.addEventListener("input", renderPersonaje);

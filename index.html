@@ -94,10 +94,24 @@
             <input id="doblarTablaPersonaje" type="range" min="-100" max="100" value="0" />
           </label>
 
+          <label class="campo">
+            Tabla
+            <select id="modoTablaPersonaje">
+              <option value="patineta">Patineta</option>
+              <option value="bici">Bici</option>
+            </select>
+          </label>
+
           <label class="switch">
-            <input id="cabezaDelineadaPersonaje" type="checkbox" />
+            <input id="cabezaDelineadaPersonaje" type="checkbox" checked />
             <span></span>
-            Delinear nodos
+            Blanco ojo
+          </label>
+
+          <label class="switch">
+            <input id="extremidadesCurvasPersonaje" type="checkbox" />
+            <span></span>
+            Extremidades
           </label>
 
           <button id="randomPersonaje" class="boton-exportar" type="button">Random</button>
@@ -126,6 +140,11 @@
           <label class="campo-color">
             Color líneas
             <input id="colorLinea" type="color" value="#111111" />
+          </label>
+
+          <label class="campo-color">
+            Color fondo
+            <input id="colorFondo" type="color" value="#efeee8" />
           </label>
         </fieldset>
       </div>

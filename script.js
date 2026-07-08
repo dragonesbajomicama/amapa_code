@@ -733,6 +733,69 @@ function encontrarPuntoCercano(posicion) {
     : null;
 }
 
+function distanciaAPiezaRecta(posicion, a, b) {
+  const dx = b.x - a.x;
+  const dy = b.y - a.y;
+  const largo = Math.max(dx * dx + dy * dy, 1);
+  const t = limitar(((posicion.x - a.x) * dx + (posicion.y - a.y) * dy) / largo, 0, 1);
+  const x = a.x + dx * t;
+  const y = a.y + dy * t;
+
+  return Math.hypot(posicion.x - x, posicion.y - y);
+}
+
+function obtenerSegmentosLetra(letra, puntos, indiceLetra) {
+  if (letra.tipo === "P" && controles.curvas.checked) {
+    return [[puntos[0], puntos[1]], [puntos[1], puntos[4]]];
+  }
+
+  return letra.lineas.map(([a, b]) => {
+    if (esUltimaAConectada(indiceLetra) && a === 0 && b === 1) {
+      return [puntos[3], puntos[1]];
+    }
+
+    return [puntos[a], puntos[b]];
+  });
+}
+
+function posicionDentroDeLetra(posicion, puntos) {
+  const xs = puntos.map((punto) => punto.x);
+  const ys = puntos.map((punto) => punto.y);
+  const margen = Math.max(Number(controles.tamanoPunto.value) * 2, 18);
+  const minX = Math.min(...xs) - margen;
+  const maxX = Math.max(...xs) + margen;
+  const minY = Math.min(...ys) - margen;
+  const maxY = Math.max(...ys) + margen;
+
+  return posicion.x >= minX && posicion.x <= maxX && posicion.y >= minY && posicion.y <= maxY;
+}
+
+function encontrarLetraCercana(posicion) {
+  let indiceCercano = null;
+  let distanciaMinima = Infinity;
+  const umbralLinea = Math.max(Number(controles.grosorLinea.value) * 3.5, 16);
+
+  letras.forEach((letra, indiceLetra) => {
+    const puntos = puntosRenderizados[indiceLetra];
+
+    obtenerSegmentosLetra(letra, puntos, indiceLetra).forEach(([a, b]) => {
+      const distancia = distanciaAPiezaRecta(posicion, a, b);
+
+      if (distancia < distanciaMinima) {
+        distanciaMinima = distancia;
+        indiceCercano = indiceLetra;
+      }
+    });
+
+    if (distanciaMinima > umbralLinea && posicionDentroDeLetra(posicion, puntos)) {
+      indiceCercano = indiceLetra;
+      distanciaMinima = umbralLinea;
+    }
+  });
+
+  return distanciaMinima <= umbralLinea ? indiceCercano : null;
+}
+
 function crearArrastreDesdePunto(punto, posicion, escala) {
   if (punto.handleInvisible === "cruceUltimaA") {
     return {
@@ -766,6 +829,16 @@ function crearArrastreDesdePunto(punto, posicion, escala) {
     tipo: "punto",
     indiceLetra: objetivo.indiceLetra,
     indicePunto: objetivo.indicePunto,
+    x: posicion.x,
+    y: posicion.y,
+    escala
+  };
+}
+
+function crearArrastreDesdeLetra(indiceLetra, posicion, escala) {
+  return {
+    tipo: "letra",
+    indiceLetra,
     x: posicion.x,
     y: posicion.y,
     escala
@@ -809,11 +882,48 @@ function actualizarPuntoRestringidoAlTronco(posicion) {
   return true;
 }
 
+function moverLetraCompleta(indiceLetra, dx, dy, escala) {
+  const deltaX = dx / escala;
+  const deltaY = dy / escala;
+  const movidos = new Set();
+
+  function moverAjuste(indice, punto) {
+    const clave = `${indice}:${punto}`;
+
+    if (movidos.has(clave)) {
+      return;
+    }
+
+    ajustesManuales[indice][punto].x += deltaX;
+    ajustesManuales[indice][punto].y += deltaY;
+    movidos.add(clave);
+  }
+
+  ajustesManuales[indiceLetra].forEach((_, indicePunto) => {
+    moverAjuste(indiceLetra, indicePunto);
+  });
+
+  puntosRenderizados[indiceLetra].forEach((punto) => {
+    if (punto.controladoPor) {
+      moverAjuste(punto.controladoPor.indiceLetra, punto.controladoPor.indicePunto);
+    }
+  });
+}
+
 function iniciarArrastreAmapa(posicion) {
   mouse = posicion;
   const punto = encontrarPuntoCercano(posicion);
 
   if (!punto) {
+    const layout = obtenerLayout();
+    const indiceLetra = encontrarLetraCercana(posicion);
+
+    if (indiceLetra !== null) {
+      arrastre = crearArrastreDesdeLetra(indiceLetra, posicion, layout.escala);
+      canvas.style.cursor = "grabbing";
+      return arrastre.tipo;
+    }
+
     arrastre = {
       tipo: "vista",
       x: posicion.x,
@@ -839,6 +949,18 @@ function moverArrastreAmapa(posicion) {
   if (arrastre.tipo === "vista") {
     desplazamientoVista.x += mouse.x - arrastre.x;
     desplazamientoVista.y += mouse.y - arrastre.y;
+    arrastre.x = mouse.x;
+    arrastre.y = mouse.y;
+    return;
+  }
+
+  if (arrastre.tipo === "letra") {
+    moverLetraCompleta(
+      arrastre.indiceLetra,
+      mouse.x - arrastre.x,
+      mouse.y - arrastre.y,
+      arrastre.escala
+    );
     arrastre.x = mouse.x;
     arrastre.y = mouse.y;
     return;
