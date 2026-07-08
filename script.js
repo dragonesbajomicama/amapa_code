@@ -26,6 +26,7 @@ function ajustarCanvas() {
 }
 
 window.addEventListener("resize", ajustarCanvas);
+window.amapaResize = ajustarCanvas;
 ajustarCanvas();
 
 const formaA = {
@@ -88,6 +89,7 @@ let tiempoCongelado = 0;
 let mouse = { x: 0, y: 0 };
 let puntosRenderizados = [];
 let arrastre = null;
+const desplazamientoVista = { x: 0, y: 0 };
 let ajustesEspeciales = {
   cruceUltimaA: { x: 0, y: 0 }
 };
@@ -137,8 +139,8 @@ function obtenerLayout() {
   const anchoBase = letras.reduce((total, letra) => total + letra.ancho, 0);
   const anchoTotal = anchoBase + separacion * (letras.length - 1);
   const escala = Math.min(w / (anchoTotal + 120), h / 280);
-  const inicioX = (w - anchoTotal * escala) / 2;
-  const inicioY = h / 2 - 75 * escala;
+  const inicioX = (w - anchoTotal * escala) / 2 + desplazamientoVista.x;
+  const inicioY = h / 2 - 75 * escala + desplazamientoVista.y;
 
   return { escala, inicioX, inicioY, separacion };
 }
@@ -647,7 +649,7 @@ function crearCirculosPuntosVisibles() {
   );
 }
 
-function crearSvgActual() {
+function crearPartesSvgAmapa() {
   const rect = canvas.getBoundingClientRect();
   const ancho = formatearNumero(rect.width);
   const alto = formatearNumero(rect.height);
@@ -665,14 +667,20 @@ function crearSvgActual() {
 
   const puntos = crearCirculosPuntosVisibles();
 
+  return { ancho, alto, paths, puntos };
+}
+
+function crearSvgActual() {
+  const partes = crearPartesSvgAmapa();
+
   return [
     '<?xml version="1.0" encoding="UTF-8"?>',
-    `<svg xmlns="http://www.w3.org/2000/svg" width="${ancho}" height="${alto}" viewBox="0 0 ${ancho} ${alto}">`,
+    `<svg xmlns="http://www.w3.org/2000/svg" width="${partes.ancho}" height="${partes.alto}" viewBox="0 0 ${partes.ancho} ${partes.alto}">`,
     '  <g id="lineas-negras">',
-    ...paths,
+    ...partes.paths,
     "  </g>",
     '  <g id="puntos-grises">',
-    ...puntos,
+    ...partes.puntos,
     "  </g>",
     "</svg>"
   ].join("\n");
@@ -696,7 +704,10 @@ function descargarSvgActual() {
   }, 1000);
 }
 
-controles.descargarSvg.addEventListener("click", descargarSvgActual);
+window.amapaSvgExport = {
+  crearPartes: crearPartesSvgAmapa,
+  descargar: descargarSvgActual
+};
 
 function encontrarPuntoCercano(posicion) {
   let cercano = null;
@@ -798,25 +809,38 @@ function actualizarPuntoRestringidoAlTronco(posicion) {
   return true;
 }
 
-canvas.addEventListener("pointerdown", (evento) => {
-  mouse = obtenerPointer(evento);
-
-  const punto = encontrarPuntoCercano(mouse);
+function iniciarArrastreAmapa(posicion) {
+  mouse = posicion;
+  const punto = encontrarPuntoCercano(posicion);
 
   if (!punto) {
-    return;
+    arrastre = {
+      tipo: "vista",
+      x: posicion.x,
+      y: posicion.y
+    };
+    canvas.style.cursor = "grabbing";
+    return arrastre.tipo;
   }
 
   const layout = obtenerLayout();
-  arrastre = crearArrastreDesdePunto(punto, mouse, layout.escala);
-  canvas.setPointerCapture(evento.pointerId);
+  arrastre = crearArrastreDesdePunto(punto, posicion, layout.escala);
   canvas.style.cursor = "grabbing";
-});
+  return arrastre.tipo;
+}
 
-canvas.addEventListener("pointermove", (evento) => {
-  mouse = obtenerPointer(evento);
+function moverArrastreAmapa(posicion) {
+  mouse = posicion;
 
   if (!arrastre) {
+    return;
+  }
+
+  if (arrastre.tipo === "vista") {
+    desplazamientoVista.x += mouse.x - arrastre.x;
+    desplazamientoVista.y += mouse.y - arrastre.y;
+    arrastre.x = mouse.x;
+    arrastre.y = mouse.y;
     return;
   }
 
@@ -845,24 +869,42 @@ canvas.addEventListener("pointermove", (evento) => {
   ajuste.y += (mouse.y - arrastre.y) / arrastre.escala;
   arrastre.x = mouse.x;
   arrastre.y = mouse.y;
-});
+}
 
-canvas.addEventListener("pointerup", (evento) => {
+function terminarArrastreAmapa() {
   if (!arrastre) {
     return;
   }
 
   arrastre = null;
+  canvas.style.cursor = "grab";
+}
+
+canvas.addEventListener("pointerdown", (evento) => {
+  iniciarArrastreAmapa(obtenerPointer(evento));
+  canvas.setPointerCapture(evento.pointerId);
+});
+
+canvas.addEventListener("pointermove", (evento) => {
+  moverArrastreAmapa(obtenerPointer(evento));
+});
+
+canvas.addEventListener("pointerup", (evento) => {
+  terminarArrastreAmapa();
   if (canvas.hasPointerCapture(evento.pointerId)) {
     canvas.releasePointerCapture(evento.pointerId);
   }
-  canvas.style.cursor = "grab";
 });
 
 canvas.addEventListener("pointercancel", () => {
-  arrastre = null;
-  canvas.style.cursor = "grab";
+  terminarArrastreAmapa();
 });
+
+window.amapaPointerProxy = {
+  down: iniciarArrastreAmapa,
+  move: moverArrastreAmapa,
+  up: terminarArrastreAmapa
+};
 
 function dibujar() {
   const w = canvas.getBoundingClientRect().width;

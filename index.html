@@ -13,7 +13,13 @@
       <p>Sistema de nodos móviles
       </p>
 
-      <div class="controles">
+      <div class="selector-modo" aria-label="Cambiar modo">
+        <button class="modo-boton activo" type="button" data-modo="amapa">AMAPA</button>
+        <button class="modo-boton" type="button" data-modo="personajes">PERSONAJES</button>
+        <button class="modo-boton" type="button" data-modo="ambos">AMBOS</button>
+      </div>
+
+      <div class="controles controles-compartidos">
         <fieldset class="grupo-controles">
           <legend>Movimiento</legend>
 
@@ -43,7 +49,9 @@
             <input id="movimiento" type="range" min="0" max="40" value="10" />
           </label>
         </fieldset>
+      </div>
 
+      <div id="controlesAmapa" class="controles controles-modo activa">
         <fieldset class="grupo-controles">
           <legend>Forma</legend>
 
@@ -70,6 +78,33 @@
           </label>
         </fieldset>
 
+      </div>
+
+      <div id="controlesPersonajes" class="controles controles-modo">
+        <fieldset class="grupo-controles">
+          <legend>Forma</legend>
+
+          <label>
+            Gravedad
+            <input id="gravedadPersonaje" type="range" min="-100" max="100" value="0" />
+          </label>
+
+          <label>
+            Doblar tabla
+            <input id="doblarTablaPersonaje" type="range" min="-100" max="100" value="0" />
+          </label>
+
+          <label class="switch">
+            <input id="cabezaDelineadaPersonaje" type="checkbox" />
+            <span></span>
+            Delinear nodos
+          </label>
+
+          <button id="randomPersonaje" class="boton-exportar" type="button">Random</button>
+        </fieldset>
+      </div>
+
+      <div class="controles controles-compartidos">
         <fieldset class="grupo-controles">
           <legend>Apariencia</legend>
 
@@ -93,18 +128,23 @@
             <input id="colorLinea" type="color" value="#111111" />
           </label>
         </fieldset>
+      </div>
 
-        <div class="acciones">
-          <button id="descargarSvg" class="boton-exportar" type="button">
-            Descargar SVG actual
-          </button>
-        </div>
+      <div class="acciones acciones-descarga">
+        <button id="descargarSvg" class="boton-exportar" type="button">
+          Descargar SVG actual
+        </button>
       </div>
     </section>
 
-    <canvas id="canvas"></canvas>
+    <section class="lienzos">
+      <canvas id="canvas" class="lienzo-modo activo"></canvas>
+      <canvas id="canvasPersonaje" class="lienzo-modo"></canvas>
+    </section>
   </main>
 
   <script src="script.js"></script>
+  <script src="personajes.js"></script>
+  <script src="modo.js"></script>
 </body>
 </html>

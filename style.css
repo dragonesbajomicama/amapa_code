@@ -5,49 +5,99 @@
 body {
   margin: 0;
   min-height: 100vh;
-  padding: 0 48px;
   background: #efeee8;
   color: #111;
   font-family: Arial, Helvetica, sans-serif;
+  overflow: hidden;
 }
 
 main {
-  width: 100%;
-  min-height: 100vh;
-  display: grid;
-  grid-template-rows: auto 1fr;
+  width: 100vw;
+  height: 100vh;
+}
+
+.selector-modo {
+  display: flex;
+  gap: 4px;
+  width: fit-content;
+  margin-bottom: 10px;
+  padding: 3px;
+  border: 1px solid rgba(17, 17, 17, 0.18);
+  border-radius: 999px;
+  background: rgba(239, 238, 232, 0.72);
+  backdrop-filter: blur(6px);
+}
+
+.modo-boton {
+  min-height: 24px;
+  padding: 0 10px;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: #111;
+  font: inherit;
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  cursor: pointer;
+}
+
+.modo-boton.activo {
+  background: #111;
+  color: #efeee8;
 }
 
 .panel {
-  padding: 22px 0 12px;
+  position: fixed;
+  top: 18px;
+  left: 18px;
+  z-index: 20;
+  width: fit-content;
+  max-width: calc(100vw - 36px);
+  max-height: calc(100vh - 36px);
+  overflow: auto;
+  padding: 12px;
+  border: 1px solid rgba(17, 17, 17, 0.1);
+  border-radius: 8px;
+  background: rgba(239, 238, 232, 0.74);
+  backdrop-filter: blur(8px);
 }
 
 h1 {
   margin: 0;
-  font-size: 28px;
+  font-size: 18px;
   letter-spacing: 0.08em;
 }
 
 p {
-  max-width: 620px;
-  margin: 8px 0 18px;
-  font-size: 14px;
-  line-height: 1.4;
+  display: none;
 }
 
 .controles {
   display: flex;
   flex-wrap: wrap;
   align-items: flex-start;
-  gap: 18px 28px;
+  gap: 10px 12px;
+}
+
+.controles-modo {
+  display: none;
+  margin-top: 10px;
+}
+
+.controles-modo.activa {
+  display: flex;
+}
+
+.controles-compartidos {
+  margin-top: 10px;
 }
 
 .grupo-controles {
   display: grid;
-  grid-template-columns: repeat(2, 142px);
+  grid-template-columns: repeat(2, 128px);
   align-content: start;
   flex: 0 0 auto;
-  gap: 10px 14px;
+  gap: 8px 10px;
   min-width: 0;
   margin: 0;
   padding: 0;
@@ -132,6 +182,10 @@ input[type="color"] {
   min-width: 0;
 }
 
+.acciones-descarga {
+  margin-top: 10px;
+}
+
 @media (max-width: 620px) {
   .grupo-controles {
     grid-template-columns: 1fr;
@@ -200,4 +254,34 @@ canvas {
   display: block;
   cursor: grab;
   touch-action: none;
+}
+
+#canvasPersonaje {
+  cursor: grab;
+}
+
+.lienzos {
+  position: fixed;
+  inset: 0;
+  z-index: 1;
+}
+
+.lienzo-modo {
+  position: absolute;
+  inset: 0;
+  display: none;
+}
+
+.lienzo-modo.activo {
+  display: block;
+}
+
+@media (max-width: 900px) {
+  .panel {
+    width: calc(100vw - 24px);
+    max-width: calc(100vw - 24px);
+    top: 12px;
+    left: 12px;
+    max-height: 46vh;
+  }
 }
