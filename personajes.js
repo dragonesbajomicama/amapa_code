@@ -19,6 +19,7 @@
     grosorLinea: document.getElementById("grosorLinea"),
     colorPunto: document.getElementById("colorPunto"),
     colorLinea: document.getElementById("colorLinea"),
+    colorFondo: document.getElementById("colorFondo"),
     random: document.getElementById("randomPersonaje"),
     botonesTabla: document.querySelectorAll(".tabla-boton")
   };
@@ -317,6 +318,10 @@
     return Number(controles.tamanoPunto.value);
   }
 
+  function obtenerColorFondo() {
+    return controles.colorFondo?.value || "#efeee8";
+  }
+
   function radioOjo() {
     const radio = obtenerRadioPunto();
     return radio + Math.max(7, radio * 1.15);
@@ -456,8 +461,8 @@
         (nombre === "cabeza" || nombre === "tablaIzq" || nombre === "tablaDer")
       ) {
         const separacionOjo = Math.max(7, radio * 1.15);
-        const fillOjo = controles.cabezaDelineada.checked ? "#ffffff" : null;
-        dibujarCirculo(formas, puntos[nombre], radio + separacionOjo, Boolean(fillOjo), true, fillOjo);
+        const fillOjo = controles.cabezaDelineada.checked ? "#ffffff" : obtenerColorFondo();
+        dibujarCirculo(formas, puntos[nombre], radio + separacionOjo, true, true, fillOjo);
         dibujarCirculo(formas, puntos[nombre], radio, true);
         return;
       }

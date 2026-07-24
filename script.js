@@ -11,6 +11,7 @@ const controles = {
   grosorLinea: document.getElementById("grosorLinea"),
   colorLinea: document.getElementById("colorLinea"),
   colorPunto: document.getElementById("colorPunto"),
+  colorFondo: document.getElementById("colorFondo"),
   autoMovimiento: document.getElementById("autoMovimiento"),
   conectarLetras: document.getElementById("conectarLetras"),
   blancoOjoAmapa: document.getElementById("blancoOjoAmapa"),
@@ -132,6 +133,10 @@ function obtenerColorLinea() {
 
 function obtenerColorPunto() {
   return controles.colorPunto.value;
+}
+
+function obtenerColorFondo() {
+  return controles.colorFondo?.value || "#efeee8";
 }
 
 function ojoBlancoActivo() {
@@ -707,10 +712,8 @@ function dibujarPuntos() {
         ctx.arc(punto.x, punto.y, tamanoPunto + separacionOjo, 0, Math.PI * 2);
         ctx.strokeStyle = obtenerColorLinea();
         ctx.lineWidth = obtenerGrosorLinea();
-        if (blancoOjo) {
-          ctx.fillStyle = "#ffffff";
-          ctx.fill();
-        }
+        ctx.fillStyle = blancoOjo ? "#ffffff" : obtenerColorFondo();
+        ctx.fill();
         ctx.stroke();
         ctx.fillStyle = fillAnterior;
         ctx.strokeStyle = strokeAnterior;
@@ -832,7 +835,7 @@ function crearElementosPunto(punto) {
   }
 
   const separacionOjo = Math.max(7, radio * 1.15);
-  const fillOjo = ojoBlancoActivo() ? "#ffffff" : "none";
+  const fillOjo = ojoBlancoActivo() ? "#ffffff" : obtenerColorFondo();
 
   return [
     `    <circle cx="${formatearNumero(punto.x)}" cy="${formatearNumero(punto.y)}" r="${formatearNumero(radio + separacionOjo)}" fill="${fillOjo}" stroke="${obtenerColorLinea()}" stroke-width="${formatearNumero(obtenerGrosorLinea())}" />`,
