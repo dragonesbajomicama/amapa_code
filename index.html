@@ -10,111 +10,99 @@
   <main>
     <section class="panel">
       <h1>AMAPA</h1>
-      <p>Sistema de nodos móviles
-      </p>
+      <p>Sistema de nodos móviles</p>
+      <button
+        id="alternarFiltros"
+        class="alternar-filtros"
+        type="button"
+        aria-expanded="true"
+        aria-controls="controlesAmapa controlesPersonajes"
+      >
+        Ocultar filtros
+      </button>
 
-      <div class="selector-modo" aria-label="Cambiar modo">
-        <button class="modo-boton activo" type="button" data-modo="amapa">AMAPA</button>
-        <button class="modo-boton" type="button" data-modo="personajes">PERSONAJES</button>
-        <button class="modo-boton" type="button" data-modo="ambos">AMBOS</button>
+      <div class="barra-superior">
+        <div class="selector-modo" aria-label="Cambiar modo">
+          <button class="modo-boton activo" type="button" data-modo="amapa">AMAPA</button>
+          <button class="modo-boton" type="button" data-modo="personajes">PERSONAJES</button>
+          <button class="modo-boton" type="button" data-modo="ambos">AMBOS</button>
+        </div>
+        <button id="descargarSvg" class="boton-exportar boton-descarga" type="button">
+          Descargar SVG
+        </button>
       </div>
 
-      <div class="controles controles-compartidos">
-        <fieldset class="grupo-controles">
-          <legend>Movimiento</legend>
-
-          <label class="campo">
-            Modo
-            <select id="modoMovimiento">
-              <option value="organico">Orgánico</option>
-              <option value="onda">Onda</option>
-              <option value="pulso">Pulso</option>
-              <option value="temblor">Temblor</option>
-            </select>
-          </label>
-
-          <label class="switch">
-            <input id="autoMovimiento" type="checkbox" checked />
-            <span></span>
-            Play/Pausa
-          </label>
-
-          <label>
-            Velocidad
-            <input id="velocidad" type="range" min="1" max="80" value="20" />
-          </label>
-
-          <label>
-            Movimiento
-            <input id="movimiento" type="range" min="0" max="40" value="10" />
-          </label>
-        </fieldset>
-      </div>
-
-      <div id="controlesAmapa" class="controles controles-modo activa">
-        <fieldset class="grupo-controles">
+      <div class="controles controles-modo activa">
+        <fieldset class="grupo-controles grupo-forma-combinada">
           <legend>Forma</legend>
 
-          <label class="switch">
-            <input id="conectarLetras" type="checkbox" />
-            <span></span>
-            Conectar letras
-          </label>
+          <div id="controlesAmapa" class="grupo-forma-modo activa">
+            <div class="fila-controles fila-botones">
+              <label class="switch control-conectar-letras">
+                <input id="conectarLetras" type="checkbox" />
+                <span></span>
+                Conectar letras
+              </label>
 
-          <label class="switch">
-            <input id="curvas" type="checkbox" checked />
-            <span></span>
-            Curvas
-          </label>
+              <label class="switch control-blanco-amapa">
+                <input id="blancoOjoAmapa" type="checkbox" checked />
+                <span></span>
+                Blanco ojo
+              </label>
+            </div>
 
-          <label>
-            Separación
-            <input id="separacion" type="range" min="18" max="95" value="44" />
-          </label>
+            <div class="fila-controles fila-barras">
+              <label class="control-separacion">
+                Separación
+                <input id="separacion" type="range" min="18" max="95" value="44" />
+              </label>
 
-          <label>
-            Longitud curva
-            <input id="variacionLineas" type="range" min="0" max="120" value="54" />
-          </label>
-        </fieldset>
+              <label id="controlLongitudCurva" class="control-longitud-curva" hidden>
+                Longitud curva
+                <input id="variacionLineas" type="range" min="0" max="120" value="54" />
+              </label>
+            </div>
+          </div>
 
-      </div>
+          <div id="controlesPersonajes" class="grupo-forma-modo">
+            <div class="fila-controles fila-botones fila-botones-personaje">
+              <div class="selector-tabla control-selector-tabla" aria-label="Tipo de tabla">
+                <button class="tabla-boton activo" type="button" data-tabla="patineta" aria-pressed="true">
+                  Patineta
+                </button>
+                <button class="tabla-boton" type="button" data-tabla="bici" aria-pressed="false">
+                  Bicicleta
+                </button>
+                <select id="modoTablaPersonaje" hidden aria-hidden="true" tabindex="-1">
+                  <option value="patineta">Patineta</option>
+                  <option value="bici">Bicicleta</option>
+                </select>
+              </div>
 
-      <div id="controlesPersonajes" class="controles controles-modo">
-        <fieldset class="grupo-controles">
-          <legend>Forma</legend>
+              <button id="randomPersonaje" class="boton-exportar control-random" type="button">Random</button>
+            </div>
 
-          <label>
-            Gravedad
-            <input id="gravedadPersonaje" type="range" min="-100" max="100" value="0" />
-          </label>
+            <div class="fila-controles fila-botones fila-switches-personaje">
+              <label class="switch control-extremidades">
+                <input id="extremidadesCurvasPersonaje" type="checkbox" />
+                <span></span>
+                Simple
+              </label>
 
-          <label>
-            Doblar tabla
-            <input id="doblarTablaPersonaje" type="range" min="-100" max="100" value="0" />
-          </label>
+              <label class="switch control-blanco-personaje">
+                <input id="cabezaDelineadaPersonaje" type="checkbox" checked />
+                <span></span>
+                Blanco ojo
+              </label>
+            </div>
 
-          <label class="campo">
-            Tabla
-            <select id="modoTablaPersonaje">
-              <option value="patineta">Patineta</option>
-              <option value="bici">Bici</option>
-            </select>
-          </label>
-
-          <label class="switch">
-            <input id="cabezaDelineadaPersonaje" type="checkbox" checked />
-            <span></span>
-            Blanco ojo
-          </label>
-
-          <label class="switch">
-            <input id="extremidadesCurvasPersonaje" type="checkbox" />
-            <span></span>
-            Extremidades
-          </label>
-
-          <button id="randomPersonaje" class="boton-exportar" type="button">Random</button>
+            <div class="fila-controles fila-barras">
+              <label class="control-doblar-tabla">
+                Doblar tabla
+                <input id="doblarTablaPersonaje" type="range" min="-100" max="100" value="0" />
+              </label>
+            </div>
+          </div>
         </fieldset>
       </div>
 
@@ -122,37 +110,92 @@
         <fieldset class="grupo-controles">
           <legend>Apariencia</legend>
 
-          <label>
-            Tamaño punto
-            <input id="tamanoPunto" type="range" min="2" max="20" value="8" />
-          </label>
+          <div class="fila-controles fila-barras">
+            <label>
+              Tamaño punto
+              <input id="tamanoPunto" type="range" min="2" max="20" value="8" />
+            </label>
 
-          <label class="campo-color">
-            Color puntos
-            <input id="colorPunto" type="color" value="#8a8a8a" />
-          </label>
+            <label>
+              Grosor línea
+              <input id="grosorLinea" type="range" min="1" max="14" value="3" />
+            </label>
+          </div>
 
-          <label>
-            Grosor línea
-            <input id="grosorLinea" type="range" min="1" max="14" value="3" />
-          </label>
+          <div class="fila-controles fila-botones">
+            <label class="campo-color">
+              <input id="colorPunto" type="color" value="#8a8a8a" />
+              Color puntos
+            </label>
 
-          <label class="campo-color">
-            Color líneas
-            <input id="colorLinea" type="color" value="#111111" />
-          </label>
+            <label class="campo-color">
+              <input id="colorLinea" type="color" value="#111111" />
+              Color líneas
+            </label>
 
-          <label class="campo-color">
-            Color fondo
-            <input id="colorFondo" type="color" value="#efeee8" />
-          </label>
+            <label class="campo-color">
+              <input id="colorFondo" type="color" value="#efeee8" />
+              Color fondo
+            </label>
+          </div>
         </fieldset>
       </div>
 
-      <div class="acciones acciones-descarga">
-        <button id="descargarSvg" class="boton-exportar" type="button">
-          Descargar SVG actual
-        </button>
+      <div class="controles controles-compartidos">
+        <fieldset class="grupo-controles">
+          <legend>Movimiento</legend>
+
+          <div class="fila-controles fila-reproduccion">
+            <div class="control-reproduccion">
+              <input id="autoMovimiento" type="checkbox" checked hidden />
+              <button
+                id="alternarMovimiento"
+                class="boton-exportar boton-reproduccion"
+                type="button"
+                aria-pressed="true"
+                aria-label="Pausa"
+                title="Pausa"
+              >
+                Ⅱ
+              </button>
+            </div>
+          </div>
+
+          <div class="fila-controles fila-barras">
+            <label>
+              Fuerza
+              <input id="movimiento" type="range" min="0" max="30" value="6" />
+            </label>
+
+            <label>
+              Velocidad
+              <input id="velocidad" type="range" min="1" max="50" value="12" />
+            </label>
+          </div>
+
+          <div class="fila-controles fila-botones fila-modo-movimiento">
+            <div class="selector-movimiento" aria-label="Modo de movimiento">
+              <button class="movimiento-boton activo" type="button" data-movimiento="organico" aria-pressed="true">
+                Orgánico
+              </button>
+              <button class="movimiento-boton" type="button" data-movimiento="onda" aria-pressed="false">
+                Onda
+              </button>
+              <button class="movimiento-boton" type="button" data-movimiento="pulso" aria-pressed="false">
+                Pulso
+              </button>
+              <button class="movimiento-boton" type="button" data-movimiento="temblor" aria-pressed="false">
+                Temblor
+              </button>
+              <select id="modoMovimiento" hidden aria-hidden="true" tabindex="-1">
+                <option value="organico">Orgánico</option>
+                <option value="onda">Onda</option>
+                <option value="pulso">Pulso</option>
+                <option value="temblor">Temblor</option>
+              </select>
+            </div>
+          </div>
+        </fieldset>
       </div>
     </section>
 

@@ -13,9 +13,21 @@ const controles = {
   colorPunto: document.getElementById("colorPunto"),
   autoMovimiento: document.getElementById("autoMovimiento"),
   conectarLetras: document.getElementById("conectarLetras"),
-  curvas: document.getElementById("curvas"),
+  blancoOjoAmapa: document.getElementById("blancoOjoAmapa"),
+  blancoOjo: document.getElementById("cabezaDelineadaPersonaje"),
   descargarSvg: document.getElementById("descargarSvg")
 };
+
+const controlLongitudCurva = document.getElementById("controlLongitudCurva");
+
+function actualizarVisibilidadLongitudCurva() {
+  if (controlLongitudCurva) {
+    controlLongitudCurva.hidden = !controles.conectarLetras.checked;
+  }
+}
+
+controles.conectarLetras.addEventListener("input", actualizarVisibilidadLongitudCurva);
+actualizarVisibilidadLongitudCurva();
 
 function ajustarCanvas() {
   const rect = canvas.getBoundingClientRect();
@@ -89,7 +101,9 @@ let tiempoCongelado = 0;
 let mouse = { x: 0, y: 0 };
 let puntosRenderizados = [];
 let arrastre = null;
+const curvasManuales = new Map();
 const desplazamientoVista = { x: 0, y: 0 };
+const puntosOjo = new Set();
 let ajustesEspeciales = {
   cruceUltimaA: { x: 0, y: 0 }
 };
@@ -120,6 +134,57 @@ function obtenerColorPunto() {
   return controles.colorPunto.value;
 }
 
+function ojoBlancoActivo() {
+  return controles.blancoOjoAmapa?.checked ?? controles.blancoOjo?.checked ?? true;
+}
+
+function curvasActivas() {
+  return true;
+}
+
+function clavePunto(punto) {
+  const objetivo = punto.controladoPor || {
+    indiceLetra: punto.indiceLetra,
+    indicePunto: punto.indicePunto
+  };
+
+  return `${objetivo.indiceLetra}:${objetivo.indicePunto}`;
+}
+
+function radioOjoPunto(punto) {
+  if (!puntosOjo.has(clavePunto(punto))) {
+    return 0;
+  }
+
+  const radio = Number(controles.tamanoPunto.value);
+  return radio + Math.max(7, radio * 1.15);
+}
+
+function puntoDesdeBordeOjo(punto, hacia) {
+  const radio = radioOjoPunto(punto);
+
+  if (!radio) {
+    return punto;
+  }
+
+  const dx = hacia.x - punto.x;
+  const dy = hacia.y - punto.y;
+  const largo = Math.max(Math.hypot(dx, dy), 1);
+
+  return {
+    ...punto,
+    x: punto.x + (dx / largo) * radio,
+    y: punto.y + (dy / largo) * radio
+  };
+}
+
+function extremosDesdeOjos(a, b) {
+  return {
+    inicio: puntoDesdeBordeOjo(a, b),
+    fin: puntoDesdeBordeOjo(b, a)
+  };
+}
+
 function formatearNumero(valor) {
   return Number(valor.toFixed(3));
 }
@@ -133,14 +198,32 @@ function obtenerPointer(evento) {
 }
 
 function obtenerLayout() {
-  const w = canvas.getBoundingClientRect().width;
-  const h = canvas.getBoundingClientRect().height;
+  const rectCanvas = canvas.getBoundingClientRect();
+  const w = rectCanvas.width;
+  const h = rectCanvas.height;
   const separacion = Number(controles.separacion.value);
   const anchoBase = letras.reduce((total, letra) => total + letra.ancho, 0);
   const anchoTotal = anchoBase + separacion * (letras.length - 1);
-  const escala = Math.min(w / (anchoTotal + 120), h / 280);
-  const inicioX = (w - anchoTotal * escala) / 2 + desplazamientoVista.x;
-  const inicioY = h / 2 - 75 * escala + desplazamientoVista.y;
+  const panel = document.querySelector(".panel");
+  const rectPanel = panel?.getBoundingClientRect();
+  let centroX = w / 2;
+  let centroY = h / 2;
+  let anchoDisponible = w;
+  let altoDisponible = h;
+
+  if (rectPanel && window.innerWidth > 700) {
+    const limiteIzquierdo = Math.min(rectPanel.right - rectCanvas.left + 24, w * 0.46);
+    centroX = limiteIzquierdo + (w - limiteIzquierdo) / 2;
+    anchoDisponible = w - limiteIzquierdo;
+  } else if (rectPanel) {
+    const limiteSuperior = Math.min(rectPanel.bottom - rectCanvas.top + 20, h * 0.4);
+    centroY = limiteSuperior + (h - limiteSuperior) / 2;
+    altoDisponible = h - limiteSuperior;
+  }
+
+  const escala = Math.min(anchoDisponible / (anchoTotal + 80), altoDisponible / 240);
+  const inicioX = centroX - (anchoTotal * escala) / 2 + desplazamientoVista.x;
+  const inicioY = centroY - 75 * escala + desplazamientoVista.y;
 
   return { escala, inicioX, inicioY, separacion };
 }
@@ -159,7 +242,7 @@ function ruidoSuave(valor) {
 }
 
 function desplazamientoAutomatico(indiceLetra, indicePunto, x, y) {
-  const intensidad = Number(controles.movimiento.value);
+  const intensidad = Number(controles.movimiento.value) * 0.46;
   const t = tiempoCongelado;
   const fase = t + indiceLetra * 0.9 + indicePunto * 1.37;
 
@@ -236,50 +319,11 @@ function calcularPuntos() {
     });
 
     if (letra.tipo === "A") {
-      const izquierda = interpolarPunto(
-        puntos[0],
-        puntos[1],
-        parametrosLetra[indiceLetra].puenteIzquierda
-      );
-      const derecha = interpolarPunto(
-        puntos[1],
-        puntos[2],
-        parametrosLetra[indiceLetra].puenteDerecha
-      );
-      puntos[3] = {
-        ...puntos[3],
-        x: izquierda.x,
-        y: izquierda.y,
-        baseX: izquierda.x,
-        baseY: izquierda.y,
-        fijoEnLinea: true,
-        handleInvisible: "puenteAIzquierda"
-      };
-      puntos[4] = {
-        ...puntos[4],
-        x: derecha.x,
-        y: derecha.y,
-        baseX: derecha.x,
-        baseY: derecha.y,
-        fijoEnLinea: true,
-        handleInvisible: "puenteADerecha"
-      };
+      actualizarPuentesA(indiceLetra, puntos, true);
     }
 
     if (letra.tipo === "P") {
-      const unionTronco = interpolarPunto(
-        puntos[1],
-        puntos[0],
-        parametrosLetra[indiceLetra].unionTronco
-      );
-      puntos[4] = {
-        ...puntos[4],
-        x: unionTronco.x,
-        y: unionTronco.y,
-        baseX: unionTronco.x,
-        baseY: unionTronco.y,
-        restringidoAlTronco: true
-      };
+      actualizarUnionP(indiceLetra, puntos, true);
     }
 
     xLetra += (letra.ancho + layout.separacion) * layout.escala;
@@ -315,32 +359,11 @@ function unirNodosCompartidos() {
     const puntos = puntosRenderizados[indiceLetra];
 
     if (letra.tipo === "A") {
-      const izquierda = interpolarPunto(
-        puntos[0],
-        puntos[1],
-        parametrosLetra[indiceLetra].puenteIzquierda
-      );
-      const derecha = interpolarPunto(
-        puntos[1],
-        puntos[2],
-        parametrosLetra[indiceLetra].puenteDerecha
-      );
-      puntos[3].x = izquierda.x;
-      puntos[3].y = izquierda.y;
-      puntos[4].x = derecha.x;
-      puntos[4].y = derecha.y;
+      actualizarPuentesA(indiceLetra, puntos);
     }
 
     if (letra.tipo === "P") {
-      const unionTronco = interpolarPunto(
-        puntos[1],
-        puntos[0],
-        parametrosLetra[indiceLetra].unionTronco
-      );
-      puntos[4].x = unionTronco.x;
-      puntos[4].y = unionTronco.y;
-      puntos[4].baseX = unionTronco.x;
-      puntos[4].baseY = unionTronco.y;
+      actualizarUnionP(indiceLetra, puntos);
     }
   });
 
@@ -351,6 +374,83 @@ function interpolarPunto(inicio, fin, t) {
   return {
     x: inicio.x + (fin.x - inicio.x) * t,
     y: inicio.y + (fin.y - inicio.y) * t
+  };
+}
+
+function puntoSobreLadoA(indiceLetra, indiceInicio, indiceFin, inicio, fin, t) {
+  const clave = claveSegmento(indiceLetra, indiceInicio, indiceFin);
+  const control = obtenerCurvaManual(clave, inicio, fin);
+
+  return control
+    ? puntoEnCurvaCuadratica(inicio, control, fin, t)
+    : interpolarPunto(inicio, fin, t);
+}
+
+function actualizarPuentesA(indiceLetra, puntos, inicializar = false) {
+  const izquierda = puntoSobreLadoA(
+    indiceLetra,
+    0,
+    1,
+    puntos[0],
+    puntos[1],
+    parametrosLetra[indiceLetra].puenteIzquierda
+  );
+  const derecha = puntoSobreLadoA(
+    indiceLetra,
+    1,
+    2,
+    puntos[1],
+    puntos[2],
+    parametrosLetra[indiceLetra].puenteDerecha
+  );
+
+  Object.assign(puntos[3], {
+    x: izquierda.x,
+    y: izquierda.y,
+    baseX: izquierda.x,
+    baseY: izquierda.y,
+    ...(inicializar ? { fijoEnLinea: true, handleInvisible: "puenteAIzquierda" } : {})
+  });
+  Object.assign(puntos[4], {
+    x: derecha.x,
+    y: derecha.y,
+    baseX: derecha.x,
+    baseY: derecha.y,
+    ...(inicializar ? { fijoEnLinea: true, handleInvisible: "puenteADerecha" } : {})
+  });
+}
+
+function actualizarUnionP(indiceLetra, puntos, inicializar = false) {
+  const clave = claveSegmento(indiceLetra, 0, 1);
+  const control = obtenerCurvaManual(clave, puntos[0], puntos[1]);
+  const t = parametrosLetra[indiceLetra].unionTronco;
+  const unionTronco = control
+    ? puntoEnCurvaCuadratica(puntos[1], control, puntos[0], t)
+    : interpolarPunto(puntos[1], puntos[0], t);
+
+  Object.assign(puntos[4], {
+    x: unionTronco.x,
+    y: unionTronco.y,
+    baseX: unionTronco.x,
+    baseY: unionTronco.y,
+    ...(inicializar ? { restringidoAlTronco: true } : {})
+  });
+}
+
+function claveSegmento(indiceLetra, a, b) {
+  return `${indiceLetra}:${a}:${b}`;
+}
+
+function obtenerCurvaManual(clave, a, b) {
+  const curva = curvasManuales.get(clave);
+
+  if (!curva) {
+    return null;
+  }
+
+  return {
+    x: (a.x + b.x) / 2 + curva.dx,
+    y: (a.y + b.y) / 2 + curva.dy
   };
 }
 
@@ -426,13 +526,29 @@ function pegarUltimaAALaCurva() {
 
 function dibujarLineaVariable(a, b, indice, curvaForzada = false) {
   const medio = obtenerControlCurva(a, b, indice);
+  const inicio = puntoDesdeBordeOjo(a, curvaForzada && curvasActivas() ? medio : b);
+  const fin = puntoDesdeBordeOjo(b, curvaForzada && curvasActivas() ? medio : a);
 
   ctx.beginPath();
-  ctx.moveTo(a.x, a.y);
-  if (curvaForzada && controles.curvas.checked) {
-    ctx.quadraticCurveTo(medio.x, medio.y, b.x, b.y);
+  ctx.moveTo(inicio.x, inicio.y);
+  if (curvaForzada && curvasActivas()) {
+    ctx.quadraticCurveTo(medio.x, medio.y, fin.x, fin.y);
   } else {
-    ctx.lineTo(b.x, b.y);
+    ctx.lineTo(fin.x, fin.y);
+  }
+  ctx.stroke();
+}
+
+function dibujarSegmentoLetra(a, b, clave = null) {
+  const extremos = extremosDesdeOjos(a, b);
+  const controlManual = clave ? obtenerCurvaManual(clave, a, b) : null;
+
+  ctx.beginPath();
+  ctx.moveTo(extremos.inicio.x, extremos.inicio.y);
+  if (controlManual) {
+    ctx.quadraticCurveTo(controlManual.x, controlManual.y, extremos.fin.x, extremos.fin.y);
+  } else {
+    ctx.lineTo(extremos.fin.x, extremos.fin.y);
   }
   ctx.stroke();
 }
@@ -452,12 +568,14 @@ function dibujarConexiones() {
   const destino = puntosRenderizados[letraDestino][puntoDestino];
   const punta = puntosRenderizados[letraDestino][1];
 
-  if (controles.curvas.checked) {
+  if (curvasActivas()) {
     const control = obtenerControlCurvaPA(origen, destino, punta);
+    const inicio = puntoDesdeBordeOjo(origen, control);
+    const fin = puntoDesdeBordeOjo(destino, control);
 
     ctx.beginPath();
-    ctx.moveTo(origen.x, origen.y);
-    ctx.quadraticCurveTo(control.x, control.y, destino.x, destino.y);
+    ctx.moveTo(inicio.x, inicio.y);
+    ctx.quadraticCurveTo(control.x, control.y, fin.x, fin.y);
     ctx.stroke();
     return;
   }
@@ -473,39 +591,64 @@ function esUltimaAConectada(indiceLetra) {
 }
 
 function dibujarTrazoLetra(letra, puntos, indiceLetra) {
-  if (letra.tipo === "P" && controles.curvas.checked) {
-    ctx.beginPath();
-    ctx.moveTo(puntos[0].x, puntos[0].y);
-    ctx.lineTo(puntos[1].x, puntos[1].y);
-    ctx.stroke();
+  if (letra.tipo === "P" && curvasActivas()) {
+    const inicioCurva = puntoDesdeBordeOjo(puntos[1], puntos[2]);
+    const finCurva = puntoDesdeBordeOjo(puntos[4], puntos[3]);
+
+    dibujarSegmentoLetra(puntos[0], puntos[1], claveSegmento(indiceLetra, 0, 1));
 
     ctx.beginPath();
-    ctx.moveTo(puntos[1].x, puntos[1].y);
+    ctx.moveTo(inicioCurva.x, inicioCurva.y);
     ctx.bezierCurveTo(
       puntos[2].x,
       puntos[2].y,
       puntos[3].x,
       puntos[3].y,
-      puntos[4].x,
-      puntos[4].y
+      finCurva.x,
+      finCurva.y
     );
     ctx.stroke();
     return;
   }
 
   letra.lineas.forEach(([a, b]) => {
+    const clave = claveSegmento(indiceLetra, a, b);
     if (esUltimaAConectada(indiceLetra) && a === 0 && b === 1) {
-      ctx.beginPath();
-      ctx.moveTo(puntos[3].x, puntos[3].y);
-      ctx.lineTo(puntos[1].x, puntos[1].y);
-      ctx.stroke();
+      dibujarSegmentoLetra(puntos[3], puntos[1], clave);
       return;
     }
 
+    dibujarSegmentoLetra(puntos[a], puntos[b], clave);
+  });
+}
+
+function dibujarControlesCurva() {
+  const radio = Math.max(5, Number(controles.tamanoPunto.value) * 0.72);
+
+  obtenerSegmentosInteractivos().forEach((segmento) => {
+    const control = obtenerCurvaManual(segmento.clave, segmento.a, segmento.b);
+    if (
+      !control ||
+      arrastre?.tipo !== "controlCurva" ||
+      arrastre.clave !== segmento.clave
+    ) {
+      return;
+    }
+
+    ctx.save();
+    ctx.setLineDash([4, 5]);
+    ctx.lineWidth = 1;
+    ctx.strokeStyle = obtenerColorPunto();
     ctx.beginPath();
-    ctx.moveTo(puntos[a].x, puntos[a].y);
-    ctx.lineTo(puntos[b].x, puntos[b].y);
+    ctx.moveTo((segmento.a.x + segmento.b.x) / 2, (segmento.a.y + segmento.b.y) / 2);
+    ctx.lineTo(control.x, control.y);
     ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.fillStyle = obtenerColorPunto();
+    ctx.beginPath();
+    ctx.arc(control.x, control.y, radio, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
   });
 }
 
@@ -516,7 +659,7 @@ function puntoVisible(letra, punto) {
 
   return !(
     letra.tipo === "P" &&
-    controles.curvas.checked &&
+    curvasActivas() &&
     letra.puntosOcultosConCurva.includes(punto.indicePunto)
   );
 }
@@ -543,6 +686,7 @@ function dibujarTrazosLetras() {
 
 function dibujarPuntos() {
   const tamanoPunto = Number(controles.tamanoPunto.value);
+  const separacionOjo = Math.max(7, tamanoPunto * 1.15);
   ctx.fillStyle = obtenerColorPunto();
 
   letras.forEach((letra, indiceLetra) => {
@@ -551,6 +695,26 @@ function dibujarPuntos() {
     puntos.forEach((punto) => {
       if (!puntoVisible(letra, punto)) {
         return;
+      }
+
+      if (puntosOjo.has(clavePunto(punto))) {
+        const blancoOjo = ojoBlancoActivo();
+        const fillAnterior = ctx.fillStyle;
+        const strokeAnterior = ctx.strokeStyle;
+        const anchoAnterior = ctx.lineWidth;
+
+        ctx.beginPath();
+        ctx.arc(punto.x, punto.y, tamanoPunto + separacionOjo, 0, Math.PI * 2);
+        ctx.strokeStyle = obtenerColorLinea();
+        ctx.lineWidth = obtenerGrosorLinea();
+        if (blancoOjo) {
+          ctx.fillStyle = "#ffffff";
+          ctx.fill();
+        }
+        ctx.stroke();
+        ctx.fillStyle = fillAnterior;
+        ctx.strokeStyle = strokeAnterior;
+        ctx.lineWidth = anchoAnterior;
       }
 
       ctx.beginPath();
@@ -578,6 +742,20 @@ function comandoCurvaCuadratica(control, fin) {
   ].join(" ");
 }
 
+function comandosSegmentoLetra(a, b, clave = null) {
+  const extremos = extremosDesdeOjos(a, b);
+  const comandos = [comandoMover(extremos.inicio)];
+  const controlManual = clave ? obtenerCurvaManual(clave, a, b) : null;
+
+  if (controlManual) {
+    comandos.push(comandoCurvaCuadratica(controlManual, extremos.fin));
+  } else {
+    comandos.push(comandoLinea(extremos.fin));
+  }
+
+  return comandos;
+}
+
 function comandoCurvaBezier(controlA, controlB, fin) {
   return [
     "C",
@@ -593,23 +771,26 @@ function comandoCurvaBezier(controlA, controlB, fin) {
 function crearPathLetra(letra, puntos, indiceLetra) {
   const comandos = [];
 
-  if (letra.tipo === "P" && controles.curvas.checked) {
+  if (letra.tipo === "P" && curvasActivas()) {
+    const inicioCurva = puntoDesdeBordeOjo(puntos[1], puntos[2]);
+    const finCurva = puntoDesdeBordeOjo(puntos[4], puntos[3]);
+
     comandos.push(
-      comandoMover(puntos[0]),
-      comandoLinea(puntos[1]),
-      comandoMover(puntos[1]),
-      comandoCurvaBezier(puntos[2], puntos[3], puntos[4])
+      ...comandosSegmentoLetra(puntos[0], puntos[1], claveSegmento(indiceLetra, 0, 1)),
+      comandoMover(inicioCurva),
+      comandoCurvaBezier(puntos[2], puntos[3], finCurva)
     );
     return comandos.join(" ");
   }
 
   letra.lineas.forEach(([a, b]) => {
+    const clave = claveSegmento(indiceLetra, a, b);
     if (esUltimaAConectada(indiceLetra) && a === 0 && b === 1) {
-      comandos.push(comandoMover(puntos[3]), comandoLinea(puntos[1]));
+      comandos.push(...comandosSegmentoLetra(puntos[3], puntos[1], clave));
       return;
     }
 
-    comandos.push(comandoMover(puntos[a]), comandoLinea(puntos[b]));
+    comandos.push(...comandosSegmentoLetra(puntos[a], puntos[b], clave));
   });
 
   return comandos.join(" ");
@@ -621,13 +802,15 @@ function crearPathConexionPA() {
   const origen = puntosRenderizados[letraOrigen][puntoOrigen];
   const destino = puntosRenderizados[letraDestino][puntoDestino];
   const punta = puntosRenderizados[letraDestino][1];
-  const control = controles.curvas.checked
+  const control = curvasActivas()
     ? obtenerControlCurvaPA(origen, destino, punta)
     : interpolarPunto(origen, destino, 0.5);
+  const inicio = puntoDesdeBordeOjo(origen, curvasActivas() ? control : destino);
+  const fin = puntoDesdeBordeOjo(destino, curvasActivas() ? control : origen);
 
   return [
-    comandoMover(origen),
-    comandoCurvaCuadratica(control, destino)
+    comandoMover(inicio),
+    comandoCurvaCuadratica(control, fin)
   ].join(" ");
 }
 
@@ -641,11 +824,27 @@ function crearElementoCirculo(punto) {
   return `    <circle cx="${formatearNumero(punto.x)}" cy="${formatearNumero(punto.y)}" r="${radio}" fill="${obtenerColorPunto()}" stroke="none" />`;
 }
 
+function crearElementosPunto(punto) {
+  const radio = Number(controles.tamanoPunto.value);
+
+  if (!puntosOjo.has(clavePunto(punto))) {
+    return [crearElementoCirculo(punto)];
+  }
+
+  const separacionOjo = Math.max(7, radio * 1.15);
+  const fillOjo = ojoBlancoActivo() ? "#ffffff" : "none";
+
+  return [
+    `    <circle cx="${formatearNumero(punto.x)}" cy="${formatearNumero(punto.y)}" r="${formatearNumero(radio + separacionOjo)}" fill="${fillOjo}" stroke="${obtenerColorLinea()}" stroke-width="${formatearNumero(obtenerGrosorLinea())}" />`,
+    crearElementoCirculo(punto)
+  ];
+}
+
 function crearCirculosPuntosVisibles() {
   return letras.flatMap((letra, indiceLetra) =>
     puntosRenderizados[indiceLetra]
       .filter((punto) => puntoVisible(letra, punto))
-      .map(crearElementoCirculo)
+      .flatMap(crearElementosPunto)
   );
 }
 
@@ -733,6 +932,30 @@ function encontrarPuntoCercano(posicion) {
     : null;
 }
 
+function encontrarPuntoVisibleCercano(posicion) {
+  let cercano = null;
+  let distanciaMinima = Infinity;
+
+  puntosRenderizados.flat().forEach((punto) => {
+    const letra = letras[punto.indiceLetra];
+
+    if (!puntoVisible(letra, punto)) {
+      return;
+    }
+
+    const distancia = Math.hypot(posicion.x - punto.x, posicion.y - punto.y);
+
+    if (distancia < distanciaMinima) {
+      distanciaMinima = distancia;
+      cercano = punto;
+    }
+  });
+
+  return distanciaMinima <= Math.max(Number(controles.tamanoPunto.value) * 2.8, 20)
+    ? cercano
+    : null;
+}
+
 function distanciaAPiezaRecta(posicion, a, b) {
   const dx = b.x - a.x;
   const dy = b.y - a.y;
@@ -744,8 +967,78 @@ function distanciaAPiezaRecta(posicion, a, b) {
   return Math.hypot(posicion.x - x, posicion.y - y);
 }
 
+function obtenerSegmentosInteractivos() {
+  return letras.flatMap((letra, indiceLetra) => {
+    if (letra.tipo === "P" && curvasActivas()) {
+      return [{
+        clave: claveSegmento(indiceLetra, 0, 1),
+        indiceLetra,
+        a: puntosRenderizados[indiceLetra][0],
+        b: puntosRenderizados[indiceLetra][1]
+      }];
+    }
+
+    return letra.lineas.map(([a, b]) => ({
+      clave: claveSegmento(indiceLetra, a, b),
+      indiceLetra,
+      a: esUltimaAConectada(indiceLetra) && a === 0 && b === 1
+        ? puntosRenderizados[indiceLetra][3]
+        : puntosRenderizados[indiceLetra][a],
+      b: puntosRenderizados[indiceLetra][b]
+    }));
+  });
+}
+
+function distanciaACurvaCuadratica(posicion, a, control, b) {
+  let minima = Infinity;
+  let anterior = a;
+
+  for (let paso = 1; paso <= 24; paso += 1) {
+    const actual = puntoEnCurvaCuadratica(a, control, b, paso / 24);
+    minima = Math.min(minima, distanciaAPiezaRecta(posicion, anterior, actual));
+    anterior = actual;
+  }
+
+  return minima;
+}
+
+function encontrarControlCurvaCercano(posicion) {
+  let resultado = null;
+  let minima = Infinity;
+
+  obtenerSegmentosInteractivos().forEach((segmento) => {
+    const control = obtenerCurvaManual(segmento.clave, segmento.a, segmento.b);
+    if (!control) return;
+    const distancia = Math.hypot(posicion.x - control.x, posicion.y - control.y);
+    if (distancia < minima) {
+      minima = distancia;
+      resultado = { ...segmento, control };
+    }
+  });
+
+  return minima <= Math.max(Number(controles.tamanoPunto.value) * 2, 15) ? resultado : null;
+}
+
+function encontrarSegmentoCercano(posicion) {
+  let resultado = null;
+  let minima = Infinity;
+
+  obtenerSegmentosInteractivos().forEach((segmento) => {
+    const control = obtenerCurvaManual(segmento.clave, segmento.a, segmento.b);
+    const distancia = control
+      ? distanciaACurvaCuadratica(posicion, segmento.a, control, segmento.b)
+      : distanciaAPiezaRecta(posicion, segmento.a, segmento.b);
+    if (distancia < minima) {
+      minima = distancia;
+      resultado = segmento;
+    }
+  });
+
+  return minima <= Math.max(Number(controles.grosorLinea.value) * 3, 12) ? resultado : null;
+}
+
 function obtenerSegmentosLetra(letra, puntos, indiceLetra) {
-  if (letra.tipo === "P" && controles.curvas.checked) {
+  if (letra.tipo === "P" && curvasActivas()) {
     return [[puntos[0], puntos[1]], [puntos[1], puntos[4]]];
   }
 
@@ -837,7 +1130,7 @@ function crearArrastreDesdePunto(punto, posicion, escala) {
 
 function crearArrastreDesdeLetra(indiceLetra, posicion, escala) {
   return {
-    tipo: "letra",
+    tipo: controles.conectarLetras.checked ? "palabra" : "letra",
     indiceLetra,
     x: posicion.x,
     y: posicion.y,
@@ -912,9 +1205,35 @@ function moverLetraCompleta(indiceLetra, dx, dy, escala) {
 
 function iniciarArrastreAmapa(posicion) {
   mouse = posicion;
+  const controlCurva = encontrarControlCurvaCercano(posicion);
+
+  if (controlCurva) {
+    arrastre = {
+      tipo: "controlCurva",
+      clave: controlCurva.clave,
+      x: posicion.x,
+      y: posicion.y
+    };
+    canvas.style.cursor = "grabbing";
+    return arrastre.tipo;
+  }
+
   const punto = encontrarPuntoCercano(posicion);
 
   if (!punto) {
+    const segmentoCurvo = encontrarSegmentoCercano(posicion);
+
+    if (segmentoCurvo && curvasManuales.has(segmentoCurvo.clave)) {
+      arrastre = {
+        tipo: "controlCurva",
+        clave: segmentoCurvo.clave,
+        x: posicion.x,
+        y: posicion.y
+      };
+      canvas.style.cursor = "grabbing";
+      return arrastre.tipo;
+    }
+
     const layout = obtenerLayout();
     const indiceLetra = encontrarLetraCercana(posicion);
 
@@ -961,6 +1280,23 @@ function moverArrastreAmapa(posicion) {
       mouse.y - arrastre.y,
       arrastre.escala
     );
+    arrastre.x = mouse.x;
+    arrastre.y = mouse.y;
+    return;
+  }
+
+  if (arrastre.tipo === "palabra") {
+    desplazamientoVista.x += mouse.x - arrastre.x;
+    desplazamientoVista.y += mouse.y - arrastre.y;
+    arrastre.x = mouse.x;
+    arrastre.y = mouse.y;
+    return;
+  }
+
+  if (arrastre.tipo === "controlCurva") {
+    const curva = curvasManuales.get(arrastre.clave);
+    curva.dx += mouse.x - arrastre.x;
+    curva.dy += mouse.y - arrastre.y;
     arrastre.x = mouse.x;
     arrastre.y = mouse.y;
     return;
@@ -1022,10 +1358,40 @@ canvas.addEventListener("pointercancel", () => {
   terminarArrastreAmapa();
 });
 
+function alternarOjoAmapa(posicion) {
+  const punto = encontrarPuntoVisibleCercano(posicion);
+
+  if (!punto) {
+    return false;
+  }
+
+  const clave = clavePunto(punto);
+
+  if (puntosOjo.has(clave)) {
+    puntosOjo.delete(clave);
+  } else {
+    puntosOjo.add(clave);
+  }
+
+  return true;
+}
+
+canvas.addEventListener("dblclick", (evento) => {
+  const posicion = obtenerPointer(evento);
+  if (!alternarOjoAmapa(posicion)) {
+    return;
+  }
+
+  evento.preventDefault();
+});
+
 window.amapaPointerProxy = {
   down: iniciarArrastreAmapa,
   move: moverArrastreAmapa,
-  up: terminarArrastreAmapa
+  up: terminarArrastreAmapa,
+  doubleClick(posicion) {
+    return alternarOjoAmapa(posicion);
+  }
 };
 
 function dibujar() {
@@ -1037,10 +1403,11 @@ function dibujar() {
   calcularPuntos();
   dibujarTrazosLetras();
   dibujarConexiones();
+  dibujarControlesCurva();
   dibujarPuntos();
 
   if (controles.autoMovimiento.checked) {
-    tiempo += Number(controles.velocidad.value) / 1000;
+    tiempo += Number(controles.velocidad.value) / 1800;
   }
 
   requestAnimationFrame(dibujar);

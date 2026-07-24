@@ -7,6 +7,66 @@
   const contenedorLienzos = document.querySelector(".lienzos");
   const botonesDescarga = [document.getElementById("descargarSvg")].filter(Boolean);
   const colorFondo = document.getElementById("colorFondo");
+  const blancoOjoAmapa = document.getElementById("blancoOjoAmapa");
+  const blancoOjoPersonaje = document.getElementById("cabezaDelineadaPersonaje");
+  const panel = document.querySelector(".panel");
+  const alternarFiltros = document.getElementById("alternarFiltros");
+  const autoMovimiento = document.getElementById("autoMovimiento");
+  const alternarMovimiento = document.getElementById("alternarMovimiento");
+  const modoMovimiento = document.getElementById("modoMovimiento");
+  const botonesMovimiento = document.querySelectorAll(".movimiento-boton");
+  const pantallaCompacta = window.matchMedia("(max-width: 700px)");
+  let sincronizandoBlancoOjo = false;
+
+  function actualizarBotonMovimiento() {
+    if (!autoMovimiento || !alternarMovimiento) {
+      return;
+    }
+
+    const etiqueta = autoMovimiento.checked ? "Pausa" : "Play";
+    alternarMovimiento.textContent = autoMovimiento.checked ? "Ⅱ" : "▶";
+    alternarMovimiento.setAttribute("aria-pressed", String(autoMovimiento.checked));
+    alternarMovimiento.setAttribute("aria-label", etiqueta);
+    alternarMovimiento.title = etiqueta;
+  }
+
+  alternarMovimiento?.addEventListener("click", () => {
+    autoMovimiento.checked = !autoMovimiento.checked;
+    autoMovimiento.dispatchEvent(new Event("input", { bubbles: true }));
+    actualizarBotonMovimiento();
+  });
+
+  actualizarBotonMovimiento();
+
+  botonesMovimiento.forEach((boton) => {
+    boton.addEventListener("click", () => {
+      modoMovimiento.value = boton.dataset.movimiento;
+      botonesMovimiento.forEach((opcion) => {
+        const activa = opcion === boton;
+        opcion.classList.toggle("activo", activa);
+        opcion.setAttribute("aria-pressed", String(activa));
+      });
+      modoMovimiento.dispatchEvent(new Event("input", { bubbles: true }));
+    });
+  });
+
+  function actualizarPanelFiltros(compacto) {
+    panel?.classList.toggle("panel-compacto", compacto);
+    alternarFiltros?.setAttribute("aria-expanded", String(!compacto));
+    if (alternarFiltros) {
+      alternarFiltros.textContent = compacto ? "Filtros" : "Ocultar filtros";
+    }
+  }
+
+  alternarFiltros?.addEventListener("click", () => {
+    actualizarPanelFiltros(!panel.classList.contains("panel-compacto"));
+  });
+
+  pantallaCompacta.addEventListener("change", (evento) => {
+    actualizarPanelFiltros(evento.matches);
+  });
+
+  actualizarPanelFiltros(pantallaCompacta.matches);
 
   function numero(valor) {
     return Number(valor.toFixed(3));
@@ -93,6 +153,7 @@
 
     controlesAmapa.classList.toggle("activa", mostrarAmapa);
     controlesPersonajes.classList.toggle("activa", mostrarPersonajes);
+    panel?.classList.toggle("modo-ambos", esAmbos);
     canvasAmapa.classList.toggle("activo", mostrarAmapa);
     canvasPersonaje.classList.toggle("activo", mostrarPersonajes);
     contenedorLienzos.classList.toggle("vista-ambos", esAmbos);
@@ -118,6 +179,25 @@
 
   botonesDescarga.forEach((boton) => {
     boton.addEventListener("click", descargarSvgVistaActual);
+  });
+
+  function sincronizarBlancoOjo(origen, destino) {
+    if (!origen || !destino || sincronizandoBlancoOjo || destino.checked === origen.checked) {
+      return;
+    }
+
+    sincronizandoBlancoOjo = true;
+    destino.checked = origen.checked;
+    destino.dispatchEvent(new Event("input", { bubbles: true }));
+    sincronizandoBlancoOjo = false;
+  }
+
+  blancoOjoAmapa?.addEventListener("input", () => {
+    sincronizarBlancoOjo(blancoOjoAmapa, blancoOjoPersonaje);
+  });
+
+  blancoOjoPersonaje?.addEventListener("input", () => {
+    sincronizarBlancoOjo(blancoOjoPersonaje, blancoOjoAmapa);
   });
 
   colorFondo?.addEventListener("input", aplicarColorFondo);

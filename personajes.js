@@ -11,7 +11,6 @@
     movimiento: document.getElementById("movimiento"),
     velocidad: document.getElementById("velocidad"),
     autoMovimiento: document.getElementById("autoMovimiento"),
-    gravedad: document.getElementById("gravedadPersonaje"),
     doblarTabla: document.getElementById("doblarTablaPersonaje"),
     modoTabla: document.getElementById("modoTablaPersonaje"),
     cabezaDelineada: document.getElementById("cabezaDelineadaPersonaje"),
@@ -20,11 +19,12 @@
     grosorLinea: document.getElementById("grosorLinea"),
     colorPunto: document.getElementById("colorPunto"),
     colorLinea: document.getElementById("colorLinea"),
-    random: document.getElementById("randomPersonaje")
+    random: document.getElementById("randomPersonaje"),
+    botonesTabla: document.querySelectorAll(".tabla-boton")
   };
 
   const nodosBase = {
-    cabeza: { x: 0, y: -114 },
+    cabeza: { x: 0, y: -104 },
     hombroIzq: { x: -32, y: -88 },
     hombroDer: { x: 32, y: -88 },
     pecho: { x: 0, y: -64 },
@@ -36,10 +36,13 @@
     pieIzq: { x: -52, y: 62 },
     pieDer: { x: 52, y: 62 },
     tablaIzq: { x: -86, y: 82 },
-    tablaBiciA: { x: -44, y: 56 },
-    tablaBiciB: { x: 0, y: 94 },
-    tablaBiciC: { x: 44, y: 56 },
-    tablaDer: { x: 86, y: 78 }
+    tablaBiciA: { x: -90, y: 12 },
+    tablaBiciB: { x: -58, y: 66 },
+    tablaBiciC: { x: -26, y: 39 },
+    tablaDer: { x: 66, y: 76 },
+    peloIzq: { x: -18, y: -132 },
+    peloCentro: { x: 0, y: -140 },
+    peloDer: { x: 18, y: -132 }
   };
 
   const lineas = [
@@ -53,7 +56,12 @@
     ["coxis", "rodillaDer"],
     ["rodillaDer", "pieDer"]
   ];
-  const nodosInvisibles = new Set(["pecho", "coxis", "tablaBiciA", "tablaBiciB", "tablaBiciC"]);
+  const nodosPelo = ["peloIzq", "peloCentro", "peloDer"];
+  const largoPelo = 24;
+  const separacionPelo = 0.42;
+  const intensidadDobladoPatineta = 0.85;
+  const intensidadDobladoBici = 0.1;
+  const nodosInvisibles = new Set(["pecho", "coxis", "tablaBiciA", "tablaBiciB", "tablaBiciC", ...nodosPelo]);
   const escalaPersonaje = 0.84;
 
   const estado = {
@@ -61,6 +69,8 @@
     tiempo: 0,
     arrastre: null,
     vista: { x: 0, y: 0 },
+    pelosActivos: false,
+    anguloPelo: -Math.PI / 2,
     formas: { paths: [], circles: [] },
     mapaRender: {}
   };
@@ -71,6 +81,31 @@
       copia[nombre] = { x: punto.x, y: punto.y };
     });
     return copia;
+  }
+
+  function sincronizarBiciConTabla() {
+    const baseIzq = nodosBase.tablaIzq;
+    const baseDer = nodosBase.tablaDer;
+    const actualIzq = estado.nodos.tablaIzq;
+    const actualDer = estado.nodos.tablaDer;
+    const baseDx = baseDer.x - baseIzq.x;
+    const baseDy = baseDer.y - baseIzq.y;
+    const actualDx = actualDer.x - actualIzq.x;
+    const actualDy = actualDer.y - actualIzq.y;
+    const largoBase2 = Math.max(baseDx * baseDx + baseDy * baseDy, 1);
+
+    ["tablaBiciA", "tablaBiciB", "tablaBiciC"].forEach((nombre) => {
+      const puntoBase = nodosBase[nombre];
+      const relativoX = puntoBase.x - baseIzq.x;
+      const relativoY = puntoBase.y - baseIzq.y;
+      const avance = (relativoX * baseDx + relativoY * baseDy) / largoBase2;
+      const lateral = (relativoX * -baseDy + relativoY * baseDx) / largoBase2;
+
+      estado.nodos[nombre] = {
+        x: actualIzq.x + avance * actualDx - lateral * actualDy,
+        y: actualIzq.y + avance * actualDy + lateral * actualDx
+      };
+    });
   }
 
   function numero(valor) {
@@ -87,12 +122,29 @@
 
   function obtenerLayout() {
     const rect = canvasPersonaje.getBoundingClientRect();
+    const panel = document.querySelector(".panel");
+    const rectPanel = panel?.getBoundingClientRect();
+    let origenX = rect.width / 2;
+    let origenY = rect.height / 2 + 30;
+    let anchoDisponible = rect.width;
+    let altoDisponible = rect.height;
+
+    if (rectPanel && window.innerWidth > 700) {
+      const limiteIzquierdo = Math.min(rectPanel.right - rect.left + 24, rect.width * 0.46);
+      origenX = limiteIzquierdo + (rect.width - limiteIzquierdo) / 2;
+      anchoDisponible = rect.width - limiteIzquierdo;
+    } else if (rectPanel) {
+      const limiteSuperior = Math.min(rectPanel.bottom - rect.top + 20, rect.height * 0.4);
+      origenY = limiteSuperior + (rect.height - limiteSuperior) / 2 + 30;
+      altoDisponible = rect.height - limiteSuperior;
+    }
+
     return {
       ancho: rect.width,
       alto: rect.height,
-      escala: Math.min(rect.width / 560, rect.height / 450) * escalaPersonaje,
-      origenX: rect.width / 2 + estado.vista.x,
-      origenY: rect.height / 2 + 30 + estado.vista.y
+      escala: Math.min(anchoDisponible / 480, altoDisponible / 390) * escalaPersonaje,
+      origenX: origenX + estado.vista.x,
+      origenY: origenY + estado.vista.y
     };
   }
 
@@ -106,32 +158,33 @@
 
   function proyectar(nombre, layout) {
     const base = estado.nodos[nombre];
-    const intensidad = Number(controles.movimiento.value) / 40;
+    const intensidad = Number(controles.movimiento.value) * 0.46;
     const faseX = estado.tiempo * 1.25 + ruido(nombre, "x") * 0.04;
     const faseY = estado.tiempo * 1.1 + ruido(nombre, "y") * 0.05;
-    let x = Math.sin(faseX) * intensidad * 4;
-    let y = Math.cos(faseY) * intensidad * 4;
+    let x = Math.sin(faseX) * intensidad * 0.75;
+    let y = Math.cos(faseY) * intensidad * 0.65;
 
     if (controles.modoMovimiento.value === "onda") {
-      x = Math.sin(estado.tiempo * 1.6 + base.y * 0.04) * intensidad * 6;
-      y = Math.cos(estado.tiempo * 1.1 + base.x * 0.035) * intensidad * 4;
+      const golpe = Math.sin(estado.tiempo * 2.1 + ruido(nombre, "x") * 0.03) * intensidad * 0.35;
+      x = Math.sin(estado.tiempo * 1.6 + base.y * 0.04) * intensidad + golpe;
+      y = Math.cos(estado.tiempo * 1.1 + base.x * 0.035) * intensidad * 0.65;
     }
 
     if (controles.modoMovimiento.value === "pulso") {
       const distancia = Math.max(Math.hypot(base.x, base.y), 1);
-      const pulso = Math.sin(estado.tiempo * 2 + ruido(nombre, "x")) * intensidad * 6;
+      const pulso = Math.sin(estado.tiempo * 2 + ruido(nombre, "x")) * intensidad * 0.9;
       x = (base.x / distancia) * pulso;
       y = (base.y / distancia) * pulso;
     }
 
     if (controles.modoMovimiento.value === "temblor") {
-      x = Math.sin(estado.tiempo * 18 + ruido(nombre, "x")) * intensidad * 3.8;
-      y = Math.cos(estado.tiempo * 19 + ruido(nombre, "y")) * intensidad * 3.8;
+      x = Math.sin(estado.tiempo * 18 + ruido(nombre, "x")) * intensidad * 1.1;
+      y = Math.cos(estado.tiempo * 19 + ruido(nombre, "y")) * intensidad * 1.1;
     }
 
     return {
-      x: layout.origenX + (base.x + x) * layout.escala,
-      y: layout.origenY + (base.y + y) * layout.escala
+      x: layout.origenX + base.x * layout.escala + x,
+      y: layout.origenY + base.y * layout.escala + y
     };
   }
 
@@ -147,6 +200,18 @@
     Object.keys(estado.nodos).forEach((nombre) => {
       puntos[nombre] = proyectar(nombre, layout);
     });
+
+    if (estado.pelosActivos) {
+      const largo = largoPeloActual(layout) * layout.escala;
+      nodosPelo.forEach((nombre) => {
+        const angulo = estado.anguloPelo + offsetPelo(nombre);
+        puntos[nombre] = {
+          x: puntos.cabeza.x + Math.cos(angulo) * largo,
+          y: puntos.cabeza.y + Math.sin(angulo) * largo
+        };
+      });
+    }
+
     return puntos;
   }
 
@@ -162,29 +227,11 @@
     return `Q ${numero(c.x)} ${numero(c.y)} ${numero(p.x)} ${numero(p.y)}`;
   }
 
-  function controlConGravedad(a, b) {
-    const gravedad = Number(controles.gravedad.value);
-    return {
-      x: (a.x + b.x) / 2,
-      y: (a.y + b.y) / 2 + gravedad * 0.42
-    };
-  }
-
   function dibujarLinea(formas, a, b) {
-    const gravedad = Number(controles.gravedad.value);
-
     ctxPersonaje.beginPath();
     ctxPersonaje.moveTo(a.x, a.y);
-
-    if (gravedad === 0) {
-      formas.paths.push(`${comandoM(a)} ${comandoL(b)}`);
-      ctxPersonaje.lineTo(b.x, b.y);
-    } else {
-      const control = controlConGravedad(a, b);
-      formas.paths.push(`${comandoM(a)} ${comandoQ(control, b)}`);
-      ctxPersonaje.quadraticCurveTo(control.x, control.y, b.x, b.y);
-    }
-
+    formas.paths.push(`${comandoM(a)} ${comandoL(b)}`);
+    ctxPersonaje.lineTo(b.x, b.y);
     ctxPersonaje.stroke();
   }
 
@@ -270,6 +317,76 @@
     return Number(controles.tamanoPunto.value);
   }
 
+  function radioOjo() {
+    const radio = obtenerRadioPunto();
+    return radio + Math.max(7, radio * 1.15);
+  }
+
+  function largoPeloActual(layout = obtenerLayout()) {
+    const extensionVisible = Math.max(12, obtenerRadioPunto() * 1.35);
+    return Math.max(
+      largoPelo,
+      (radioOjo() + extensionVisible) / Math.max(layout.escala, 0.001)
+    );
+  }
+
+  function offsetPelo(nombre) {
+    if (nombre === "peloIzq") {
+      return -separacionPelo;
+    }
+
+    if (nombre === "peloDer") {
+      return separacionPelo;
+    }
+
+    return 0;
+  }
+
+  function actualizarPelosDesdeCabeza() {
+    const cabeza = estado.nodos.cabeza;
+    const largo = largoPeloActual();
+
+    nodosPelo.forEach((nombre) => {
+      const angulo = estado.anguloPelo + offsetPelo(nombre);
+      estado.nodos[nombre] = {
+        x: cabeza.x + Math.cos(angulo) * largo,
+        y: cabeza.y + Math.sin(angulo) * largo
+      };
+    });
+  }
+
+  function acomodarPelosDesdeCabeza() {
+    estado.anguloPelo = -Math.PI / 2;
+    actualizarPelosDesdeCabeza();
+  }
+
+  function cabezaCercana(posicion) {
+    const cabeza = estado.mapaRender.cabeza;
+
+    if (!cabeza) {
+      return false;
+    }
+
+    return Math.hypot(posicion.x - cabeza.x, posicion.y - cabeza.y) <= radioOjo() + 12;
+  }
+
+  function drawHair(formas, puntos) {
+    if (!estado.pelosActivos) {
+      return;
+    }
+
+    nodosPelo.forEach((nombre) => {
+      const punta = puntos[nombre];
+
+      if (!punta) {
+        return;
+      }
+
+      const inicio = desplazarHacia(puntos.cabeza, punta, radioOjo());
+      dibujarLinea(formas, inicio, punta);
+    });
+  }
+
   function drawSkeleton(formas, puntos) {
     if (controles.extremidadesCurvas.checked) {
       dibujarLinea(formas, puntos.pecho, puntos.coxis);
@@ -301,7 +418,7 @@
     if (controles.modoTabla.value === "bici") {
       const a = desplazarHacia(centroA, puntos.tablaBiciA, margenNodo);
       const b = desplazarHacia(centroB, puntos.tablaBiciC, margenNodo);
-      const direccion = curva * 0.28 * escala;
+      const direccion = curva * intensidadDobladoBici * escala;
       dibujarCurvaSuave(formas, [
         a,
         { x: puntos.tablaBiciA.x, y: puntos.tablaBiciA.y - direccion },
@@ -316,7 +433,7 @@
     const b = desplazarHacia(centroB, centroA, margenNodo);
     const control = {
       x: (a.x + b.x) / 2,
-      y: (a.y + b.y) / 2 - curva * 2.8 * escala
+      y: (a.y + b.y) / 2 - curva * intensidadDobladoPatineta * escala
     };
 
     if (curva === 0) {
@@ -363,6 +480,7 @@
     configurarTrazo();
 
     drawSkeleton(formas, puntos);
+    drawHair(formas, puntos);
     drawBoard(formas, puntos, layout.escala);
     drawNodes(formas, puntos, layout.escala);
 
@@ -372,7 +490,7 @@
 
   function animarPersonaje() {
     if (!estado.arrastre && controles.autoMovimiento.checked) {
-      estado.tiempo += Number(controles.velocidad.value) / 1000;
+      estado.tiempo += Number(controles.velocidad.value) / 1800;
     }
     renderPersonaje();
     requestAnimationFrame(animarPersonaje);
@@ -393,6 +511,10 @@
 
     Object.entries(estado.mapaRender).forEach(([nombre, punto]) => {
       if (nodosSoloBici.has(nombre) && controles.modoTabla.value !== "bici") {
+        return;
+      }
+
+      if (nodosPelo.includes(nombre) && !estado.pelosActivos) {
         return;
       }
 
@@ -502,9 +624,9 @@
       : desplazarHacia(centroB, centroA, margenNodo);
     const control = {
       x: (a.x + b.x) / 2,
-      y: (a.y + b.y) / 2 - curva * 2.8 * obtenerLayout().escala
+      y: (a.y + b.y) / 2 - curva * intensidadDobladoPatineta * obtenerLayout().escala
     };
-    const direccion = curva * 0.28 * obtenerLayout().escala;
+    const direccion = curva * intensidadDobladoBici * obtenerLayout().escala;
     const puntosBici = [
       a,
       { x: estado.mapaRender.tablaBiciA.x, y: estado.mapaRender.tablaBiciA.y - direccion },
@@ -603,17 +725,148 @@
     return document.querySelector(".lienzos")?.classList.contains("vista-ambos");
   }
 
+  function aleatorio(minimo, maximo) {
+    return minimo + Math.random() * (maximo - minimo);
+  }
+
   function mezclarPersonaje() {
-    estado.nodos = clonarNodos(nodosBase);
-    Object.keys(estado.nodos).forEach((nombre) => {
-      if (nombre === "cabeza") {
-        estado.nodos[nombre].x += Math.random() * 28 - 14;
-        estado.nodos[nombre].y += Math.random() * 18 - 9;
-        return;
-      }
-      estado.nodos[nombre].x += Math.random() * 42 - 21;
-      estado.nodos[nombre].y += Math.random() * 34 - 17;
+    const anclaActual = {
+      x: (estado.nodos.pecho.x + estado.nodos.coxis.x) / 2,
+      y: (estado.nodos.pecho.y + estado.nodos.coxis.y) / 2
+    };
+    const tablaActual = clonarNodos({
+      tablaIzq: estado.nodos.tablaIzq,
+      tablaBiciA: estado.nodos.tablaBiciA,
+      tablaBiciB: estado.nodos.tablaBiciB,
+      tablaBiciC: estado.nodos.tablaBiciC,
+      tablaDer: estado.nodos.tablaDer
     });
+    const direccion = Math.random() > 0.5 ? 1 : -1;
+    const posesSkate = [
+      {
+        nombre: "ollie",
+        inclinacion: aleatorio(12, 25) * direccion,
+        compresion: aleatorio(12, 24),
+        apertura: aleatorio(46, 62),
+        rodillas: [aleatorio(24, 36), aleatorio(42, 58)],
+        piesY: [aleatorio(58, 72), aleatorio(72, 88)],
+        brazosY: [aleatorio(-46, -22), aleatorio(2, 30)]
+      },
+      {
+        nombre: "salto",
+        inclinacion: aleatorio(-10, 10),
+        compresion: aleatorio(24, 34),
+        apertura: aleatorio(28, 44),
+        rodillas: [aleatorio(16, 28), aleatorio(18, 32)],
+        piesY: [aleatorio(38, 54), aleatorio(40, 56)],
+        brazosY: [aleatorio(-54, -30), aleatorio(-48, -20)]
+      },
+      {
+        nombre: "grab",
+        inclinacion: aleatorio(16, 30) * direccion,
+        compresion: aleatorio(20, 32),
+        apertura: aleatorio(34, 50),
+        rodillas: [aleatorio(18, 30), aleatorio(22, 36)],
+        piesY: [aleatorio(44, 60), aleatorio(48, 64)],
+        brazosY: [aleatorio(24, 42), aleatorio(-34, -12)]
+      },
+      {
+        nombre: "aterrizaje",
+        inclinacion: aleatorio(-14, 14),
+        compresion: aleatorio(30, 42),
+        apertura: aleatorio(52, 70),
+        rodillas: [aleatorio(34, 48), aleatorio(34, 50)],
+        piesY: [aleatorio(78, 92), aleatorio(78, 92)],
+        brazosY: [aleatorio(-22, 8), aleatorio(-18, 12)]
+      }
+    ];
+    const pose = posesSkate[Math.floor(Math.random() * posesSkate.length)];
+    const inclinacion = pose.inclinacion;
+    const compresion = pose.compresion;
+    const apertura = pose.apertura;
+    const centroX = aleatorio(-6, 6);
+    const centroY = aleatorio(-3, 4);
+    const pecho = {
+      x: centroX + inclinacion * 0.25,
+      y: -64 + centroY + compresion * 0.18
+    };
+    const coxis = {
+      x: centroX - inclinacion * 0.25,
+      y: -24 + centroY + compresion
+    };
+    const ejeX = pecho.x - coxis.x;
+    const ejeY = pecho.y - coxis.y;
+
+    estado.nodos = {
+      cabeza: {
+        x: pecho.x + ejeX * 0.38 + aleatorio(-3, 3),
+        y: pecho.y + ejeY * 0.38 - aleatorio(14, 21)
+      },
+      hombroIzq: {
+        x: pecho.x - aleatorio(28, 38) + inclinacion * 0.08,
+        y: pecho.y - aleatorio(16, 24)
+      },
+      hombroDer: {
+        x: pecho.x + aleatorio(28, 38) + inclinacion * 0.08,
+        y: pecho.y - aleatorio(16, 24)
+      },
+      pecho,
+      coxis,
+      codoIzq: {
+        x: pecho.x - aleatorio(54, 86),
+        y: pecho.y + pose.brazosY[0]
+      },
+      codoDer: {
+        x: pecho.x + aleatorio(54, 86),
+        y: pecho.y + pose.brazosY[1]
+      },
+      rodillaIzq: {
+        x: coxis.x - apertura * 0.42 + direccion * aleatorio(-12, 16),
+        y: coxis.y + pose.rodillas[0]
+      },
+      rodillaDer: {
+        x: coxis.x + apertura * 0.42 + direccion * aleatorio(-16, 12),
+        y: coxis.y + pose.rodillas[1]
+      },
+      pieIzq: {
+        x: coxis.x - apertura + direccion * aleatorio(-10, 10),
+        y: coxis.y + pose.piesY[0]
+      },
+      pieDer: {
+        x: coxis.x + apertura + direccion * aleatorio(-10, 10),
+        y: coxis.y + pose.piesY[1]
+      },
+      ...tablaActual,
+      peloIzq: { x: 0, y: 0 },
+      peloCentro: { x: 0, y: 0 },
+      peloDer: { x: 0, y: 0 }
+    };
+
+    const anclaNueva = {
+      x: (estado.nodos.pecho.x + estado.nodos.coxis.x) / 2,
+      y: (estado.nodos.pecho.y + estado.nodos.coxis.y) / 2
+    };
+    const ajusteX = anclaActual.x - anclaNueva.x;
+    const ajusteY = anclaActual.y - anclaNueva.y;
+
+    [
+      "cabeza",
+      "hombroIzq",
+      "hombroDer",
+      "pecho",
+      "coxis",
+      "codoIzq",
+      "codoDer",
+      "rodillaIzq",
+      "rodillaDer",
+      "pieIzq",
+      "pieDer"
+    ].forEach((nombre) => {
+      estado.nodos[nombre].x += ajusteX;
+      estado.nodos[nombre].y += ajusteY;
+    });
+
+    acomodarPelosDesdeCabeza();
     renderPersonaje();
   }
 
@@ -719,7 +972,9 @@
 
     estado.arrastre = {
       tipo: "nodo",
-      nombre: nodo
+      nombre: nodo,
+      x: posicion.x,
+      y: posicion.y
     };
     canvasPersonaje.setPointerCapture(evento.pointerId);
     canvasPersonaje.style.cursor = "grabbing";
@@ -772,7 +1027,7 @@
 
     if (estado.arrastre.tipo === "personaje") {
       moverNodos(
-        ["cabeza", "hombroIzq", "hombroDer", "pecho", "coxis", "codoIzq", "codoDer", "rodillaIzq", "rodillaDer", "pieIzq", "pieDer"],
+        ["cabeza", "hombroIzq", "hombroDer", "pecho", "coxis", "codoIzq", "codoDer", "rodillaIzq", "rodillaDer", "pieIzq", "pieDer", ...nodosPelo],
         posicion.x - estado.arrastre.x,
         posicion.y - estado.arrastre.y,
         obtenerLayout()
@@ -783,7 +1038,24 @@
       return;
     }
 
-    estado.nodos[estado.arrastre.nombre] = desproyectar(posicion, obtenerLayout());
+    const layout = obtenerLayout();
+    const nuevoPunto = desproyectar(posicion, layout);
+
+    if (nodosPelo.includes(estado.arrastre.nombre)) {
+      const cabeza = estado.mapaRender.cabeza;
+      estado.anguloPelo =
+        Math.atan2(posicion.y - cabeza.y, posicion.x - cabeza.x) - offsetPelo(estado.arrastre.nombre);
+      actualizarPelosDesdeCabeza();
+      estado.arrastre.x = posicion.x;
+      estado.arrastre.y = posicion.y;
+      renderPersonaje();
+      return;
+    }
+
+    estado.nodos[estado.arrastre.nombre] = nuevoPunto;
+    if (estado.arrastre.nombre === "cabeza" && estado.pelosActivos) {
+      actualizarPelosDesdeCabeza();
+    }
     renderPersonaje();
   });
 
@@ -806,13 +1078,54 @@
     canvasPersonaje.style.cursor = "grab";
   });
 
+  canvasPersonaje.addEventListener("dblclick", (evento) => {
+    const posicion = obtenerPointer(evento);
+
+    if (cabezaCercana(posicion)) {
+      estado.pelosActivos = !estado.pelosActivos;
+      if (estado.pelosActivos) {
+        acomodarPelosDesdeCabeza();
+      }
+      renderPersonaje();
+      evento.preventDefault();
+      return;
+    }
+
+    if (!vistaAmbosActiva() || !window.amapaPointerProxy) {
+      return;
+    }
+
+    if (nodoCercano(posicion)) {
+      return;
+    }
+
+    if (window.amapaPointerProxy.doubleClick(posicion)) {
+      evento.preventDefault();
+    }
+  });
+
   controles.movimiento.addEventListener("input", renderPersonaje);
   controles.velocidad.addEventListener("input", renderPersonaje);
   controles.autoMovimiento.addEventListener("input", renderPersonaje);
   controles.modoMovimiento.addEventListener("input", renderPersonaje);
-  controles.gravedad.addEventListener("input", renderPersonaje);
   controles.doblarTabla.addEventListener("input", renderPersonaje);
-  controles.modoTabla.addEventListener("input", renderPersonaje);
+  controles.modoTabla.addEventListener("input", () => {
+    if (controles.modoTabla.value === "bici") {
+      sincronizarBiciConTabla();
+    }
+    renderPersonaje();
+  });
+  controles.botonesTabla.forEach((boton) => {
+    boton.addEventListener("click", () => {
+      controles.modoTabla.value = boton.dataset.tabla;
+      controles.botonesTabla.forEach((opcion) => {
+        const activa = opcion === boton;
+        opcion.classList.toggle("activo", activa);
+        opcion.setAttribute("aria-pressed", String(activa));
+      });
+      controles.modoTabla.dispatchEvent(new Event("input", { bubbles: true }));
+    });
+  });
   controles.cabezaDelineada.addEventListener("input", renderPersonaje);
   controles.extremidadesCurvas.addEventListener("input", renderPersonaje);
   controles.tamanoPunto.addEventListener("input", renderPersonaje);
