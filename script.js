@@ -1019,6 +1019,48 @@ function encontrarControlCurvaCercano(posicion) {
   return minima <= Math.max(Number(controles.tamanoPunto.value) * 2, 15) ? resultado : null;
 }
 
+function encontrarManejadorCurvaP(posicion) {
+  if (!curvasActivas()) {
+    return null;
+  }
+
+  let resultado = null;
+  let distanciaMinima = Infinity;
+
+  letras.forEach((letra, indiceLetra) => {
+    if (letra.tipo !== "P") {
+      return;
+    }
+
+    const puntos = puntosRenderizados[indiceLetra];
+    const [inicio, controlA, controlB, fin] = [puntos[1], puntos[2], puntos[3], puntos[4]];
+    const t = 0.5;
+    const inv = 1 - t;
+    const manejador = {
+      x:
+        inv ** 3 * inicio.x +
+        3 * inv ** 2 * t * controlA.x +
+        3 * inv * t ** 2 * controlB.x +
+        t ** 3 * fin.x,
+      y:
+        inv ** 3 * inicio.y +
+        3 * inv ** 2 * t * controlA.y +
+        3 * inv * t ** 2 * controlB.y +
+        t ** 3 * fin.y
+    };
+    const distancia = Math.hypot(posicion.x - manejador.x, posicion.y - manejador.y);
+
+    if (distancia < distanciaMinima) {
+      distanciaMinima = distancia;
+      resultado = { indiceLetra, manejador };
+    }
+  });
+
+  return distanciaMinima <= Math.max(Number(controles.tamanoPunto.value) * 2.4, 20)
+    ? resultado
+    : null;
+}
+
 function encontrarSegmentoCercano(posicion) {
   let resultado = null;
   let minima = Infinity;
@@ -1218,6 +1260,20 @@ function iniciarArrastreAmapa(posicion) {
     return arrastre.tipo;
   }
 
+  const manejadorCurvaP = encontrarManejadorCurvaP(posicion);
+
+  if (manejadorCurvaP) {
+    arrastre = {
+      tipo: "curvaP",
+      indiceLetra: manejadorCurvaP.indiceLetra,
+      x: posicion.x,
+      y: posicion.y,
+      escala: obtenerLayout().escala
+    };
+    canvas.style.cursor = "grabbing";
+    return arrastre.tipo;
+  }
+
   const punto = encontrarPuntoCercano(posicion);
 
   if (!punto) {
@@ -1288,6 +1344,20 @@ function moverArrastreAmapa(posicion) {
   if (arrastre.tipo === "palabra") {
     desplazamientoVista.x += mouse.x - arrastre.x;
     desplazamientoVista.y += mouse.y - arrastre.y;
+    arrastre.x = mouse.x;
+    arrastre.y = mouse.y;
+    return;
+  }
+
+  if (arrastre.tipo === "curvaP") {
+    const deltaX = (mouse.x - arrastre.x) / arrastre.escala;
+    const deltaY = (mouse.y - arrastre.y) / arrastre.escala;
+
+    [2, 3].forEach((indicePunto) => {
+      ajustesManuales[arrastre.indiceLetra][indicePunto].x += deltaX;
+      ajustesManuales[arrastre.indiceLetra][indicePunto].y += deltaY;
+    });
+
     arrastre.x = mouse.x;
     arrastre.y = mouse.y;
     return;
